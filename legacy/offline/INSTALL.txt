@@ -1,0 +1,30 @@
+PERSONAL DASHBOARD OFFLINE
+For the jailbroken Kindle (10th generation / KT4).
+
+INSTALL
+
+1. Extract this ZIP on the PC.
+2. Copy KindleDashboardNative into Kindle USB storage beside documents.
+3. Copy Personal Dashboard Offline.sh into the Kindle's documents folder.
+4. Disconnect USB, then open Personal Dashboard Offline from the Library.
+
+The dashboard uses the FBInk utility installed with Kindle scriptlet
+support. It opens directly on the e-ink screen in Airplane Mode.
+Use the moon or sun to change the theme, and EXIT to return to the
+Library. Music and shortcut interactions use simulated data.
+The display refreshes on taps to limit e-ink redraws.
+
+If the launcher reports an error, reconnect USB and check
+KindleDashboardNative/dashboard.log. The saved theme is in theme.txt.
+
+BUILD FROM SOURCE
+
+From KindleDashboardNative/source, using Go 1.27 or newer:
+
+CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=7 go build -trimpath -ldflags="-s -w" -o ../personal-dashboard .
+
+The PNG backdrops preserve the original dashboard design and artwork.
+Font and Go dependency licenses are included with the source files.
+
+Kindle scriptlets: https://kindlemodding.org/kindle-dev/scriptlets.html
+FBInk: https://github.com/NiLuJe/FBInk

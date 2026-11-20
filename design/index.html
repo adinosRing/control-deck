@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="dashboard-session" content="DASHBOARD_SESSION">
+  <title>Control Deck</title>
+  <link rel="stylesheet" href="dashboard.css">
+  <script src="dashboard.js" defer></script>
+</head>
+<body>
+  <main class="dashboard" id="dashboard" aria-label="Control Deck">
+    <div class="status-bar">
+      <time id="clock">10:24 AM</time>
+      <span id="date">MON, JAN 27</span>
+      <canvas class="status-chevron" data-icon="chevron" aria-hidden="true"></canvas>
+      <span class="status-right" title="Demo connection and battery indicators">
+        <canvas data-icon="wifi" aria-hidden="true"></canvas>
+        <span>96%</span>
+        <canvas class="battery" data-icon="battery" aria-hidden="true"></canvas>
+      </span>
+    </div>
+    <header class="masthead">
+      <div class="masthead-main">
+        <h1>CONTROL DECK</h1>
+        <button class="square" id="theme" aria-label="Toggle light mode" aria-pressed="false" title="Toggle light mode"><canvas data-icon="theme" aria-hidden="true"></canvas></button>
+        <button class="square" id="info" aria-label="Dashboard information" title="Dashboard information"><b aria-hidden="true">i</b></button>
+      </div>
+      <button class="exit" id="exit">EXIT</button>
+    </header>
+
+    <div class="top-panels">
+      <section class="panel music">
+        <h2><canvas data-icon="music" aria-hidden="true"></canvas>YOUTUBE CONTROL<canvas class="end-icon" data-icon="levels" aria-hidden="true"></canvas></h2>
+        <div class="panel-body music-body">
+          <div class="track">
+            <div class="album"><canvas id="album" width="96" height="88" aria-hidden="true"></canvas></div>
+            <div class="track-info">
+              <div class="badge" id="play-status">NOW PLAYING</div>
+              <h3 id="track-title">Midnight Drive</h3>
+              <p id="track-artist">Nexora</p>
+              <div class="scrub">
+                <div class="scrub-fill" id="seek-fill"></div>
+                <input id="seek" type="range" min="0" max="236" value="102" aria-label="Track position">
+              </div>
+              <div class="track-time"><span id="elapsed">1:42</span><span id="duration">3:56</span></div>
+            </div>
+          </div>
+          <div class="transport" aria-label="Demo playback controls">
+            <button id="shuffle" aria-label="Captions" aria-pressed="false" title="Captions"><canvas data-icon="captions" aria-hidden="true"></canvas></button>
+            <button id="previous" aria-label="Previous track" title="Previous track"><canvas data-icon="previous" aria-hidden="true"></canvas></button>
+            <button class="play-button" id="play" aria-label="Pause" title="Pause"><canvas data-icon="pause" aria-hidden="true"></canvas></button>
+            <button id="next" aria-label="Next track" title="Next track"><canvas data-icon="next" aria-hidden="true"></canvas></button>
+            <button id="repeat" aria-label="Repeat" aria-pressed="false" title="Repeat"><canvas data-icon="repeat" aria-hidden="true"></canvas></button>
+          </div>
+          <div class="volume">
+            <button id="mute" aria-label="Mute" aria-pressed="false" title="Mute"><canvas data-icon="volume" aria-hidden="true"></canvas></button>
+            <div class="volume-slider">
+              <div class="segments volume-segments" id="volume-segments" aria-hidden="true"></div>
+              <input id="volume" type="range" min="0" max="100" value="80" aria-label="Volume">
+            </div>
+            <output id="volume-value" for="volume">80%</output>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel codex">
+        <h2>CODEX LIMITS</h2>
+        <div class="panel-body codex-body">
+          <div class="code-icon" aria-hidden="true">&lt;/&gt;</div>
+          <dl class="limits">
+            <div><dt>USED</dt><dd class="segments quota" id="quota" aria-hidden="true"></dd><dd>64%</dd></div>
+            <div><dt>RESET IN</dt><dd>14h 35m (TUE 12:00 AM)</dd></div>
+          </dl>
+        </div>
+      </section>
+
+      <section class="panel assistant">
+        <h2>MIA</h2>
+        <div class="panel-body portrait">
+          <div class="portrait-placeholder" role="img" aria-label="Pixel robot portrait"><div class="robot"><span></span><i></i></div></div>
+        </div>
+      </section>
+    </div>
+
+    <section class="panel performance">
+      <h2>PC PERFORMANCE MONITOR<canvas class="end-icon" data-icon="pulse" aria-hidden="true"></canvas></h2>
+      <div class="panel-body performance-body">
+        <div class="metric">
+          <h3>CPU</h3>
+          <div class="gauge"><canvas data-gauge="46" aria-hidden="true"></canvas><b>46%</b></div>
+          <p class="capacity" aria-hidden="true">&nbsp;</p>
+          <canvas class="spark" data-spark="cpu" aria-hidden="true"></canvas>
+        </div>
+        <div class="metric">
+          <h3>GPU</h3>
+          <div class="gauge"><canvas data-gauge="72" aria-hidden="true"></canvas><b>72%</b></div>
+          <p class="capacity" aria-hidden="true">&nbsp;</p>
+          <canvas class="spark" data-spark="gpu" aria-hidden="true"></canvas>
+        </div>
+        <div class="metric">
+          <h3>RAM</h3>
+          <div class="gauge"><canvas data-gauge="68" aria-hidden="true"></canvas><b>68%</b></div>
+          <p class="capacity">21.8 / 32.0 GB</p>
+          <canvas class="spark" data-spark="ram" aria-hidden="true"></canvas>
+        </div>
+        <div class="metric">
+          <h3>VRAM</h3>
+          <div class="gauge"><canvas data-gauge="68" aria-hidden="true"></canvas><b>68%</b></div>
+          <p class="capacity">8.2 / 12.0 GB</p>
+          <canvas class="spark" data-spark="vram" aria-hidden="true"></canvas>
+        </div>
+        <div class="telemetry">
+          <div class="telemetry-block temps">
+            <canvas data-icon="temperature" aria-hidden="true"></canvas>
+            <dl>
+              <div><dt>CPU</dt><dd>62°C</dd></div>
+              <div><dt>GPU</dt><dd>71°C</dd></div>
+            </dl>
+          </div>
+          <div class="telemetry-block network">
+            <h3><canvas data-icon="wifi" aria-hidden="true"></canvas>NET</h3>
+            <p aria-label="Download 48.6 megabytes per second">↓ 48.6 MB/s</p>
+            <p aria-label="Upload 5.2 megabytes per second">↑ 5.2 MB/s</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel launch">
+      <h2><canvas data-icon="grid" aria-hidden="true"></canvas>QUICK LAUNCH CONTROL<canvas class="end-icon" data-icon="slashes" aria-hidden="true"></canvas></h2>
+      <div class="shortcuts" aria-label="Demo shortcuts">
+        <button data-launch="ChatGPT"><canvas data-icon="chatgpt" aria-hidden="true"></canvas>CHATGPT</button>
+        <button data-launch="Claude"><canvas data-icon="claude" aria-hidden="true"></canvas>CLAUDE</button>
+        <button data-launch="VS Code"><canvas data-icon="vscode" aria-hidden="true"></canvas>VSCODE</button>
+        <button data-launch="Browser"><canvas data-icon="browser" aria-hidden="true"></canvas>BROWSER</button>
+        <button data-launch="YouTube"><canvas data-icon="youtube" aria-hidden="true"></canvas>YOUTUBE</button>
+        <button data-launch="Terminal"><canvas data-icon="terminal" aria-hidden="true"></canvas>TERMINAL</button>
+      </div>
+    </section>
+  </main>
+
+  <div class="overlay" id="overlay" hidden>
+    <section class="dialog" role="dialog" aria-modal="true" aria-labelledby="dialog-title" aria-describedby="dialog-message">
+      <h2 id="dialog-title"></h2>
+      <p id="dialog-message"></p>
+      <div class="dialog-actions">
+        <button id="fullscreen" hidden>FULL SCREEN</button>
+        <button id="confirm-exit" hidden>EXIT</button>
+        <button id="dismiss">CLOSE</button>
+      </div>
+    </section>
+  </div>
+  <section class="closed" id="closed" hidden role="status">
+    <h2>DASHBOARD CLOSED</h2>
+    <p id="closed-message"></p>
+  </section>
+  <noscript><p class="closed">Enable JavaScript in the browser to use the dashboard.</p></noscript>
+</body>
+</html>

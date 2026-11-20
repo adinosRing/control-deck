@@ -1,0 +1,73 @@
+PERSONAL DASHBOARD 1.0
+Kindle (10th generation / KT4), firmware 5.16.9
+
+INSTALL OVER USB
+
+1. Unzip this package. Connect the Kindle by USB.
+2. Copy the folder named KindleDashboard to the Kindle's storage,
+   alongside its existing documents folder.
+3. Pick the launcher you already use:
+   - Library scriptlets: copy both .sh files from the package's
+     documents folder into the Kindle's existing documents folder.
+   - KUAL: copy the personal-dashboard folder from the package's
+     extensions folder into the Kindle's existing extensions folder.
+4. Eject and disconnect the Kindle. Tap Personal Dashboard in the
+   Library, or KUAL > Personal Dashboard > Start dashboard.
+5. In the Kindle's web browser, type this full address:
+
+      http://127.0.0.1:8080/
+
+   The launcher starts the server and asks the Kindle to open its
+   browser. If the browser stays closed, open Web Browser from the
+   Kindle's menu and enter the same address. Bookmark the address for
+   next time. After a reboot, run the launcher again before opening
+   the bookmark.
+
+DISPLAY AND CONTROLS
+
+- Tap the moon or sun in the header to switch between dark and light
+  mode. The setting is saved by the browser at this address.
+- Tap the information button for the full-screen option when the
+  browser exposes it. The page also fits inside the regular browser.
+- Music controls change a simulated player. Codex limits, PC stats,
+  battery and connections are demo values. Quick-launch buttons show
+  simulated actions. The clock uses the browser's device time.
+- Tap EXIT and confirm to stop the server. You can also tap Stop
+  Personal Dashboard in the Library or Stop dashboard in KUAL.
+
+IF THE DASHBOARD DOES NOT OPEN
+
+- If the Library does not show the launchers, use KUAL if it is
+  already installed. Library launch requires scriptlet support.
+- Confirm KindleDashboard/dashboard-server and KindleDashboard/web
+  are visible at the top level of Kindle storage. The app folder
+  should be adjacent to documents, with a single KindleDashboard
+  level.
+- Confirm the address starts with http:// and ends in :8080/.
+  The app serves everything from the Kindle. If the stock browser
+  asks to enable Wi-Fi before opening, that prompt belongs to the
+  browser. The dashboard itself only connects to the Kindle.
+- If the address cannot be reached after running the launcher, check
+  KindleDashboard/dashboard.log over USB for the startup error.
+  The server uses port 8080 and reports a bind error if it is in use.
+
+REMOVE
+
+Use the stop launcher. Remove KindleDashboard and the two .sh files
+you copied, or remove the personal-dashboard extension folder if
+you used KUAL.
+
+DESKTOP PREVIEW AND SOURCE
+
+Open KindleDashboard/web/index.html in a desktop browser for a local
+preview. Build the Kindle binary before transferring the files. To rebuild it from the
+KindleDashboard folder with Go installed on Linux or macOS:
+
+    CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=7 go build -trimpath -ldflags="-s -w" -o dashboard-server source/server.go
+
+The browser assets are in web/. The portrait panel uses a CSS illustration. Font licenses for
+Pixelify Sans and IBM Plex Mono are in web/assets/. Go runtime
+notices are in source/GO-LICENSE.txt.
+
+Kindle scriptlets: https://kindlemodding.org/kindle-dev/scriptlets.html
+KUAL setup: https://kindlemodding.org/jailbreaking/Legacy/post-jailbreak/installing-kual-mrpi/
