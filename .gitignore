@@ -12,7 +12,8 @@ dist/
 **/bridge-config.json
 **/pc-bridge.json
 **/pairing.js
-**/personal-dashboard
+**/KindleDashboardNative/personal-dashboard
+/kindle/native/personal-dashboard
 **/dashboard-server
 **/theme.txt
 **/portrait.webp

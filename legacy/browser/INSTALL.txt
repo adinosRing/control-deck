@@ -3,7 +3,8 @@ Kindle (10th generation / KT4), firmware 5.16.9
 
 INSTALL OVER USB
 
-1. Unzip this package. Connect the Kindle by USB.
+1. Build dashboard-server from source as described below, then connect
+   the Kindle by USB.
 2. Copy the folder named KindleDashboard to the Kindle's storage,
    alongside its existing documents folder.
 3. Pick the launcher you already use:

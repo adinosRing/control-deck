@@ -1,0 +1,12 @@
+{
+  "items": [
+    {
+      "name": "Personal Dashboard",
+      "priority": 20,
+      "items": [
+        { "name": "Start dashboard", "action": "/mnt/us/KindleDashboard/launcher.sh", "params": "start" },
+        { "name": "Stop dashboard", "action": "/mnt/us/KindleDashboard/launcher.sh", "params": "stop" }
+      ]
+    }
+  ]
+}

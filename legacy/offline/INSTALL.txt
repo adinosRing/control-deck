@@ -3,7 +3,7 @@ For the jailbroken Kindle (10th generation / KT4).
 
 INSTALL
 
-1. Extract this ZIP on the PC.
+1. Build personal-dashboard from source as described below.
 2. Copy KindleDashboardNative into Kindle USB storage beside documents.
 3. Copy Personal Dashboard Offline.sh into the Kindle's documents folder.
 4. Disconnect USB, then open Personal Dashboard Offline from the Library.

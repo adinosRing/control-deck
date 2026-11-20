@@ -29,7 +29,7 @@ def main():
                     executable_path=args.browser,
                     args=["--disable-lcd-text", "--disable-background-networking"],
                 )
-                page = browser.new_page(viewport={"width": 600, "height": 800}, device_scale_factor=1)
+                page = browser.new_page(viewport={"width": 600, "height": 800}, device_scale_factor=1, timezone_id="UTC")
                 page.clock.set_fixed_time("2026-01-26T10:24:00Z")
                 page.goto(f"http://127.0.0.1:{server.server_port}/")
                 page.locator("main.dashboard").wait_for()
