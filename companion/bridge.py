@@ -16,6 +16,8 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE / "vendor"))
 
 from browser_link import BrowserLink, BrowserUnavailable
+from pc_stats import PCStats
+from todo import TodoFile, TodoUnavailable
 
 LOG = logging.getLogger("kindle-dashboard")
 
@@ -83,7 +85,8 @@ class BridgeHandler(BaseHTTPRequestHandler):
                     video = link.query("status") if link.ready() else None
                 except BrowserUnavailable:
                     video = None
-                self.send_json(200, {"youtube": video, "browser_ready": link.ready()})
+                self.send_json(200, {"youtube": video, "browser_ready": link.ready(), "stats": self.server.stats.snapshot(),
+                                     "todo": self.server.todo.snapshot()})
             else:
                 self.send_json(404, {"error": "Unknown dashboard request."})
 
@@ -92,7 +95,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
             return
         try:
             length = int(self.headers.get("Content-Length", "0"))
-            if not 0 < length <= 512:
+            if not 0 < length <= 1024:
                 raise ValueError("Invalid request length.")
             data = json.loads(self.rfile.read(length))
             if not isinstance(data, dict):
@@ -100,6 +103,12 @@ class BridgeHandler(BaseHTTPRequestHandler):
             if self.path == "/launch" and isinstance(data.get("name"), str):
                 launch(data["name"])
                 result = {"ok": True}
+            elif self.path == "/todo" and data.get("action") == "todo-toggle":
+                line, text = data.get("value"), data.get("text")
+                if type(line) is not int or not isinstance(text, str):
+                    raise ValueError("Invalid to-do command.")
+                self.server.todo.toggle(line, text)
+                result = {"todo": self.server.todo.snapshot(), "ok": True}
             elif self.path == "/youtube" and data.get("action") in {
                 "previous", "next", "toggle", "seek", "captions", "repeat", "volume", "mute"
             }:
@@ -110,7 +119,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
             else:
                 raise ValueError("Unknown dashboard command.")
             self.send_json(200, result)
-        except (ActionUnavailable, BrowserUnavailable) as exc:
+        except (ActionUnavailable, BrowserUnavailable, TodoUnavailable) as exc:
             self.send_json(409, {"error": str(exc)})
         except (ValueError, TypeError):
             self.send_json(400, {"error": "Invalid dashboard command."})
@@ -136,6 +145,7 @@ class BridgeServer(ThreadingHTTPServer):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=Path, default=HERE / "bridge-config.json")
+    parser.add_argument("--todo", type=Path, default=HERE / "todo.txt", help="to-do list shown on the Kindle")
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
     config = json.loads(args.config.read_text(encoding="utf-8"))
@@ -146,6 +156,9 @@ def main():
     with BridgeServer(("0.0.0.0", config["port"]), BridgeHandler) as server:
         server.tls = tls
         server.browser = browser
+        server.stats = PCStats().start()
+        server.todo = TodoFile(args.todo)
+        LOG.info("To-do list: %s", args.todo.resolve())
         browser_server = browser.listen()
         server.authorization = ("Bearer " + config["token"]).encode("ascii")
         server.networks = tuple(ipaddress.ip_network(item) for item in config["networks"])

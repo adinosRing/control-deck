@@ -47,6 +47,34 @@ def write_local(path, text):
         Path(name).unlink(missing_ok=True)
 
 
+def python_identity(key_path, cert_path):
+    """Create the same self-signed certificate as the OpenSSL command, using the cryptography package."""
+    import datetime
+    from cryptography import x509
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import rsa
+    from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
+
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "kindle-dashboard.local")])
+    now = datetime.datetime.now(datetime.timezone.utc)
+    certificate = (
+        x509.CertificateBuilder()
+        .subject_name(name).issuer_name(name)
+        .public_key(private_key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(now - datetime.timedelta(minutes=5))
+        .not_valid_after(now + datetime.timedelta(days=1095))
+        .add_extension(x509.SubjectAlternativeName([x509.DNSName("kindle-dashboard.local")]), critical=False)
+        .add_extension(x509.ExtendedKeyUsage([ExtendedKeyUsageOID.SERVER_AUTH]), critical=False)
+        .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+        .sign(private_key, hashes.SHA256())
+    )
+    key_path.write_bytes(private_key.private_bytes(
+        serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()))
+    cert_path.write_bytes(certificate.public_bytes(serialization.Encoding.PEM))
+
+
 def ensure_identity(key, cert, openssl):
     if key.exists() != cert.exists():
         raise SystemExit("The existing TLS key and certificate are incomplete. Restore the missing file before pairing.")
@@ -61,7 +89,10 @@ def ensure_identity(key, cert, openssl):
                 "-addext", "extendedKeyUsage=serverAuth",
                 "-out", str(staged_cert), "-keyout", str(staged_key),
             ]
-            subprocess.run(command, check=True, capture_output=True)
+            if openssl:
+                subprocess.run(command, check=True, capture_output=True)
+            else:
+                python_identity(staged_key, staged_cert)
             staged_key.replace(key)
             staged_cert.replace(cert)
 
@@ -74,10 +105,13 @@ def main():
     parser.add_argument("--output", type=Path,
                         default=COMPANION.parent / "dist" / "KindleDashboardNative")
     parser.add_argument("--openssl", default=shutil.which("openssl"),
-                        help="Path to the OpenSSL executable.")
+                        help="Path to the OpenSSL executable. Without it, the cryptography package is used.")
     args = parser.parse_args()
     if not args.openssl:
-        parser.error("OpenSSL is required. Pass the path to openssl.exe with --openssl.")
+        try:
+            import cryptography  # noqa: F401
+        except ImportError:
+            parser.error("Install the requirements (pip install -r companion/requirements.txt) or pass --openssl.")
 
     args.output.mkdir(parents=True, exist_ok=True)
     key, cert = (COMPANION / name for name in ("bridge-key.pem", "bridge-cert.pem"))

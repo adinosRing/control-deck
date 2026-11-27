@@ -201,6 +201,21 @@
     const time = (now.getHours() % 12 || 12) + ":" + twoDigits(now.getMinutes()) + (now.getHours() < 12 ? " AM" : " PM");
     write("clock", time);
     write("date", days[now.getDay()] + ", " + months[now.getMonth()] + " " + now.getDate());
+    const weekdays = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"];
+    const monthNames = ["JANUARY", "FEBRUARY", "MARCH", "APRIL", "MAY", "JUNE", "JULY", "AUGUST", "SEPTEMBER", "OCTOBER", "NOVEMBER", "DECEMBER"];
+    const yearStart = new Date(now.getFullYear(), 0, 1);
+    const dayOfYear = Math.round((new Date(now.getFullYear(), now.getMonth(), now.getDate()) - yearStart) / 86400000) + 1;
+    write("today-month", months[now.getMonth()]);
+    write("today-day", String(now.getDate()));
+    write("today-weekday", weekdays[now.getDay()]);
+    write("today-date", now.getDate() + " " + monthNames[now.getMonth()] + " " + now.getFullYear());
+    write("today-week", "WEEK " + isoWeek(now) + " · DAY " + dayOfYear);
+  }
+
+  function isoWeek(date) {
+    const day = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    day.setUTCDate(day.getUTCDate() + 4 - (day.getUTCDay() || 7));
+    return Math.ceil(((day - Date.UTC(day.getUTCFullYear(), 0, 1)) / 86400000 + 1) / 7);
   }
 
   function write(id, value) {
@@ -322,7 +337,7 @@
   }
 
   byId("info").addEventListener("click", (event) => {
-    showDialog("PERSONAL DASHBOARD", "Demo mode. Music controls, Codex limits, PC readings and quick launch use sample data. Tap the moon or sun to change the display theme.", event.currentTarget, { fullscreen: true });
+    showDialog("PERSONAL DASHBOARD", "Demo mode. Music controls, PC readings and quick launch use sample data. Tap the moon or sun to change the display theme.", event.currentTarget, { fullscreen: true });
   });
   document.querySelectorAll("[data-launch]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -385,10 +400,16 @@
   fit();
   drawAlbum();
   applyTheme(savedTheme === "light" ? "light" : "dark");
-  segments(byId("quota"), 14, 64);
   updateVolume();
   updateProgress();
   updateClock();
+  // Preview only: tap a task to tick it off. On the Kindle, tasks come from todo.txt on the PC.
+  const todoItems = Array.from(document.querySelectorAll("#todo-list li:not(.empty)"));
+  function updateTodoCount() {
+    write("todo-count", todoItems.filter((item) => item.classList.contains("done")).length + "/" + todoItems.length);
+  }
+  todoItems.forEach((item) => item.addEventListener("click", () => { item.classList.toggle("done"); updateTodoCount(); }));
+  updateTodoCount();
   // Group redraws in five-second steps to limit e-ink refreshes.
   window.setInterval(() => {
     if (closed || document.hidden) return;

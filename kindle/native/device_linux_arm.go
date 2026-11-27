@@ -124,6 +124,20 @@ func paint(ctx context.Context, fbink, path string, frame image.Image, flash boo
 	return nil
 }
 
+// screenViewport asks FBInk for the real screen size so the dashboard fills
+// larger screens such as the Paperwhite's 1072 × 1448 panel.
+func screenViewport(ctx context.Context, fbink string) viewport {
+	probe, stop := context.WithTimeout(ctx, 4*time.Second)
+	defer stop()
+	output, err := exec.CommandContext(probe, fbink, "-e").CombinedOutput()
+	if w, h, ok := parseFBInkState(string(output)); err == nil && ok {
+		log.Printf("Screen %dx%d", w, h)
+		return newViewport(w, h)
+	}
+	log.Printf("Could not read the screen size (%v); assuming 600x800", err)
+	return newViewport(width, height)
+}
+
 func saveTheme(path, theme string) error {
 	file, err := os.CreateTemp(filepath.Dir(path), ".dashboard-theme-")
 	if err != nil {
@@ -183,27 +197,39 @@ func runDevice(art *artwork, model *dashboard, preference string) error {
 		go bridge.run(ctx, commands, updates)
 	}
 
-	if err := paint(ctx, fbink, framePath, art.render(model, time.Now()), true); err != nil {
+	view := screenViewport(ctx, fbink)
+	if err := paint(ctx, fbink, framePath, view.fit(art.render(model, time.Now()), model.theme.paper), true); err != nil {
 		return err
 	}
+	// Repaint at the start of every minute so the time and date stay current.
+	minute := time.NewTimer(time.Until(time.Now().Truncate(time.Minute).Add(time.Minute)))
+	defer minute.Stop()
 	for {
 		flash := false
 		select {
 		case <-ctx.Done():
 			return nil
+		case <-minute.C:
+			minute.Reset(time.Until(time.Now().Truncate(time.Minute).Add(time.Minute)))
 		case update := <-updates:
 			wasOnline, wasBrowserReady := model.pcOnline, model.browserReady
 			model.pcOnline = update.err == nil
 			if update.action == nil {
 				model.browserReady = update.reply.BrowserReady
-				if wasOnline == model.pcOnline && wasBrowserReady == model.browserReady && reflect.DeepEqual(model.youtube, update.reply.YouTube) {
+				if wasOnline == model.pcOnline && wasBrowserReady == model.browserReady && reflect.DeepEqual(model.youtube, update.reply.YouTube) && reflect.DeepEqual(model.stats, update.reply.Stats) && reflect.DeepEqual(model.todo, update.reply.Todo) {
 					continue
 				}
 				model.youtube = update.reply.YouTube
+				model.stats = update.reply.Stats
+				model.todo = update.reply.Todo
 			} else if update.err != nil {
 				model.show("PC OFFLINE", "Connect the Kindle and PC to the same local network and start the PC companion. Then try again.")
 			} else if update.reply.Error != "" {
 				model.show("PC ACTION", update.reply.Error)
+			} else if update.action.Action == "todo-toggle" {
+				if update.reply.Todo != nil {
+					model.todo = update.reply.Todo
+				}
 			} else if update.action.Name == "" {
 				model.browserReady = update.reply.BrowserReady
 				model.youtube = update.reply.YouTube
@@ -213,7 +239,9 @@ func runDevice(art *artwork, model *dashboard, preference string) error {
 				return tap.err
 			}
 			var exit bool
-			exit, flash = model.tap(tap.point, time.Now())
+			point := view.fromTouch(tap.point)
+			log.Printf("Tap at %v (panel %v)", point, tap.point)
+			exit, flash = model.tap(point, time.Now())
 			if exit {
 				return nil
 			}
@@ -236,7 +264,7 @@ func runDevice(art *artwork, model *dashboard, preference string) error {
 				}
 			}
 		}
-		if err := paint(ctx, fbink, framePath, art.render(model, time.Now()), flash); err != nil {
+		if err := paint(ctx, fbink, framePath, view.fit(art.render(model, time.Now()), model.theme.paper), flash); err != nil {
 			if ctx.Err() != nil {
 				return nil
 			}

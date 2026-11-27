@@ -64,22 +64,34 @@
         </div>
       </section>
 
-      <section class="panel codex">
-        <h2>CODEX LIMITS</h2>
-        <div class="panel-body codex-body">
-          <div class="code-icon" aria-hidden="true">&lt;/&gt;</div>
-          <dl class="limits">
-            <div><dt>USED</dt><dd class="segments quota" id="quota" aria-hidden="true"></dd><dd>64%</dd></div>
-            <div><dt>RESET IN</dt><dd>14h 35m (TUE 12:00 AM)</dd></div>
-          </dl>
+      <section class="panel today">
+        <h2>TODAY</h2>
+        <div class="panel-body today-body">
+          <div class="day-box" aria-hidden="true"><span id="today-month">JAN</span><b id="today-day">26</b></div>
+          <div class="today-text">
+            <h3 id="today-weekday">MONDAY</h3>
+            <p id="today-date">26 JANUARY 2026</p>
+            <p class="today-week" id="today-week">WEEK 5 · DAY 26</p>
+          </div>
         </div>
       </section>
 
-      <section class="panel assistant">
-        <h2>MIA</h2>
-        <div class="panel-body portrait">
-          <div class="portrait-placeholder" role="img" aria-label="Pixel robot portrait"><div class="robot"><span></span><i></i></div></div>
+      <section class="panel todo">
+        <h2>TO-DO<span class="todo-count" id="todo-count">2/6</span></h2>
+        <div class="panel-body todo-body">
+          <ul class="todo-list" id="todo-list" aria-label="To-do list">
+            <li><i class="check" aria-hidden="true"></i><span>Finish OS project report</span></li>
+            <li><i class="check" aria-hidden="true"></i><span>IoT lab: ESP32 Wi-Fi experiment</span></li>
+            <li><i class="check" aria-hidden="true"></i><span>Revise COCA pipelining notes</span></li>
+            <li><i class="check" aria-hidden="true"></i><span>Solve 3 DSA problems</span></li>
+            <li class="done"><i class="check" aria-hidden="true"></i><span>Submit lab certificate</span></li>
+            <li class="done"><i class="check" aria-hidden="true"></i><span>Buy USB cable</span></li>
+            <li class="empty"></li>
+            <li class="empty"></li>
+          </ul>
         </div>
+      </section>
+    </div>
       </section>
     </div>
 

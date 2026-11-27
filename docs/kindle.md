@@ -37,7 +37,9 @@ The pairing command generates a browser token, a separate Kindle token, and a TL
 
 1. Run `python companion/bridge.py` from the repository root and leave it running. The Kindle uses HTTPS on TCP port **8765**, and the browser extension connects through Windows loopback on **8766**. Allow the Kindle's local subnet through the firewall if required. Keep both ports off public internet.
 2. In Brave, open `brave://extensions`. In Chrome, open `chrome://extensions`. Enable **Developer mode**, select **Load unpacked**, and choose the `companion/youtube-extension` folder after pairing has generated `pairing.js`. [Chromium extension loading instructions](https://developer.chrome.com/docs/extensions/get-started/tutorial/hello-world#load_an_unpacked_extension)
-3. Open or reload a YouTube video in that browser profile and press Play once. The extension chooses an active YouTube player, preferring a playing tab. Captions and next-video controls depend on the video or playlist.
+3. The companion also samples the PC every 2.5 seconds for the **PC Performance Monitor**: CPU, RAM, battery and network speed through `psutil`, and GPU and VRAM through `nvidia-smi` when an NVIDIA GPU is installed. Values the PC cannot report show `--`. A desktop without a battery shows **AC POWER**. The Kindle polls every 5 seconds.
+4. The **TO-DO** panel reads `companion/todo.txt`, which the companion creates on first run. Write one task per line. A line starting with `x ` is done, and lines starting with `#` are ignored. Tapping a task on the Kindle adds or removes the `x ` and saves the file. Open tasks are listed first, up to eight. To keep the list somewhere else, start the companion with `python companion/bridge.py --todo "C:\Users\you\Documents\todo.txt"`.
+5. Open or reload a YouTube video in that browser profile and press Play once. The extension chooses an active YouTube player, preferring a playing tab. Captions and next-video controls depend on the video or playlist.
 
 ## 3. Install and test on the Kindle
 
@@ -62,6 +64,8 @@ Kindle USB root/
 - **App absent from the Kindle Library.** Confirm the file ends in `.sh`, is inside `documents`, and the installed Kindle hotfix includes scriptlet support. [Scriptlet setup](https://kindlemodding.org/kindle-dev/scriptlets.html)
 - **PC Offline.** Check the companion output, local network, firewall, and the address used in pairing. If the IP changed, rerun the pairing command and recopy the generated files. Check the Kindle's date and time if a TLS connection fails.
 - **Browser Setup.** Load or reload the unpacked extension in the same profile as the YouTube tab. Reload the video, then retry **Play**.
+- **Performance panel shows `--`.** Make sure `pip install -r companion/requirements.txt` installed `psutil`, and that the Kindle is not showing **PC Offline**. GPU and VRAM need `nvidia-smi` on the PATH, so they stay `--` on AMD or Intel graphics.
+- **Preview the panel without a Kindle.** Run `go run . -preview preview.png -preview-stats stats.json` from `kindle/native`, where `stats.json` holds a sample reply from the companion.
 - **Blank screen or touch issues.** Reconnect the Kindle over USB and read `KindleDashboardNative/dashboard.log`. Confirm the firmware has FBInk and the screen/touch hardware fits the KT4 profile.
 
 ## Customize the artwork

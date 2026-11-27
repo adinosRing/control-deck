@@ -26,6 +26,8 @@ type youtubeVideo struct {
 
 type bridgeReply struct {
 	YouTube      *youtubeVideo
+	Stats        *pcStats
+	Todo         *todoList
 	BrowserReady bool `json:"browser_ready"`
 	OK           bool
 	Error        string
@@ -35,6 +37,7 @@ type bridgeAction struct {
 	Name   string `json:"name,omitempty"`
 	Action string `json:"action,omitempty"`
 	Value  int    `json:"value"`
+	Text   string `json:"text,omitempty"`
 }
 
 type bridgeConfig struct {
@@ -155,6 +158,8 @@ func (b *pcBridge) send(ctx context.Context, action bridgeAction) (bridgeReply, 
 	path := "/youtube"
 	if action.Name != "" {
 		path = "/launch"
+	} else if action.Action == "todo-toggle" {
+		path = "/todo"
 	}
 	// A timed-out action may already have run. Do not retry it.
 	reply, err := b.request(ctx, b.active, path, &action)
@@ -171,7 +176,8 @@ type bridgeUpdate struct {
 }
 
 func (b *pcBridge) run(ctx context.Context, commands <-chan bridgeAction, updates chan<- bridgeUpdate) {
-	timer := time.NewTicker(14 * time.Second)
+	// Poll often enough for the PC performance monitor to feel live.
+	timer := time.NewTicker(5 * time.Second)
 	defer timer.Stop()
 	deliver := func(update bridgeUpdate) {
 		select {

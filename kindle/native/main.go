@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"embed"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"image"
@@ -30,10 +31,11 @@ var assets embed.FS
 type theme struct {
 	name                                  string
 	paper, panel, ink, frame, line, track color.Gray
+	shade, muted                          color.Gray
 }
 
-var dark = theme{"dark", color.Gray{25}, color.Gray{32}, color.Gray{237}, color.Gray{209}, color.Gray{140}, color.Gray{102}}
-var light = theme{"light", color.Gray{242}, color.Gray{249}, color.Gray{24}, color.Gray{41}, color.Gray{117}, color.Gray{173}}
+var dark = theme{"dark", color.Gray{25}, color.Gray{32}, color.Gray{237}, color.Gray{209}, color.Gray{140}, color.Gray{102}, color.Gray{69}, color.Gray{195}}
+var light = theme{"light", color.Gray{242}, color.Gray{249}, color.Gray{24}, color.Gray{41}, color.Gray{117}, color.Gray{173}, color.Gray{216}, color.Gray{59}}
 
 var tracks = []struct {
 	title, artist string
@@ -54,6 +56,8 @@ type dashboard struct {
 	updated                             time.Time
 	connectedUI, pcOnline, browserReady bool
 	youtube                             *youtubeVideo
+	stats                               *pcStats
+	todo                                *todoList
 	pending                             *bridgeAction
 }
 
@@ -122,9 +126,9 @@ func (d *dashboard) tap(point image.Point, now time.Time) (exit, flash bool) {
 			return false, true
 		case x >= 446 && x < 490:
 			if d.connectedUI {
-				d.show("CONTROL DECK", "Quick Launch and YouTube control the PC. Codex limits and PC performance use fixed sample values.")
+				d.show("CONTROL DECK", "Quick Launch, YouTube, the PC performance monitor and the to-do list use the PC companion. Tap a task to tick it off in todo.txt.")
 			} else {
-				d.show("CONTROL DECK", "Offline dashboard for Kindle. Music, Codex limits, PC stats and shortcuts use sample data.")
+				d.show("CONTROL DECK", "Offline dashboard for Kindle. Music, PC stats, tasks and shortcuts use sample data.")
 			}
 		case x >= 490:
 			d.show("EXIT DASHBOARD?", "Return to the Kindle Library.")
@@ -132,6 +136,13 @@ func (d *dashboard) tap(point image.Point, now time.Time) (exit, flash bool) {
 		}
 	}
 	if d.connectedUI {
+		if row, ok := todoRowAt(point); ok {
+			if d.todo != nil && d.pcOnline && row < len(d.todo.Items) {
+				item := d.todo.Items[row]
+				d.pending = &bridgeAction{Action: "todo-toggle", Value: item.Line, Text: item.Text}
+			}
+			return false, false
+		}
 		d.pending = connectedTap(point)
 		return false, false
 	}
@@ -177,8 +188,9 @@ func (d *dashboard) tap(point image.Point, now time.Time) (exit, flash bool) {
 }
 
 type artwork struct {
-	backdrops                 map[string]image.Image
-	title, label, body, small font.Face
+	backdrops                              map[string]image.Image
+	title, label, body, small, tiny        font.Face
+	day, weekday, month, count, date, week font.Face
 }
 
 func openArtwork() (*artwork, error) {
@@ -203,7 +215,10 @@ func openArtwork() (*artwork, error) {
 		dest *font.Face
 	}{
 		{"pixelify.ttf", 25, &art.title}, {"pixelify.ttf", 16, &art.label},
-		{"plex-mono.ttf", 16, &art.body}, {"plex-mono.ttf", 14, &art.small},
+		{"plex-mono.ttf", 16, &art.body}, {"plex-mono.ttf", 14, &art.small}, {"plex-mono.ttf", 12, &art.tiny},
+		{"pixelify.ttf", 40, &art.day}, {"pixelify.ttf", 32, &art.weekday},
+		{"pixelify.ttf", 15, &art.month}, {"pixelify.ttf", 17, &art.count},
+		{"plex-mono.ttf", 15, &art.date}, {"plex-mono.ttf", 13, &art.week},
 	} {
 		data, err := assets.ReadFile("assets/" + item.file)
 		if err != nil {
@@ -362,6 +377,16 @@ func (a *artwork) render(d *dashboard, now time.Time) *image.Gray {
 	}
 	textAt(img, a.small, 358-font.MeasureString(a.small, level).Ceil(), 309, level, t.ink)
 
+	a.drawToday(img, t, now)
+	if d.connectedUI {
+		stats := d.stats
+		if !d.pcOnline {
+			stats = nil
+		}
+		a.drawStats(img, t, stats)
+		a.drawTodo(img, t, d.todo, d.pcOnline)
+	}
+
 	if d.dialogTitle != "" {
 		rectangle(img, 71, 307, 529, 496, t.panel)
 		outline(img, image.Rect(71, 307, 529, 496), t.frame)
@@ -407,6 +432,8 @@ func main() {
 	preview := flag.String("preview", "", "render a PNG and exit")
 	previewTheme := flag.String("theme", "dark", "theme for a PNG preview")
 	bridgeCheck := flag.String("bridge-check", "", "test pairing from the given directory")
+	previewStats := flag.String("preview-stats", "", "JSON file of PC stats to show in a PNG preview")
+	previewTodo := flag.String("preview-todo", "", "JSON file of a to-do list to show in a PNG preview")
 	flag.Parse()
 	if *bridgeCheck != "" {
 		bridge, err := readBridge(*bridgeCheck)
@@ -417,7 +444,7 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		fmt.Printf("PC connected, browser extension: %t, YouTube video: %t\n", reply.BrowserReady, reply.YouTube != nil)
+		fmt.Printf("PC connected, browser extension: %t, YouTube video: %t, PC stats: %t\n", reply.BrowserReady, reply.YouTube != nil, reply.Stats != nil)
 		return
 	}
 	art, err := openArtwork()
@@ -426,7 +453,28 @@ func main() {
 	}
 	now := time.Now()
 	if *preview != "" {
-		if err := writePNG(*preview, art.render(newDashboard(*previewTheme, now), now)); err != nil {
+		model := newDashboard(*previewTheme, now)
+		if *previewStats != "" {
+			raw, err := os.ReadFile(*previewStats)
+			if err != nil {
+				log.Fatal(err)
+			}
+			model.connectedUI, model.pcOnline, model.browserReady = true, true, true
+			if err := json.Unmarshal(raw, &model.stats); err != nil {
+				log.Fatal(err)
+			}
+		}
+		if *previewTodo != "" {
+			raw, err := os.ReadFile(*previewTodo)
+			if err != nil {
+				log.Fatal(err)
+			}
+			model.connectedUI, model.pcOnline = true, true
+			if err := json.Unmarshal(raw, &model.todo); err != nil {
+				log.Fatal(err)
+			}
+		}
+		if err := writePNG(*preview, art.render(model, now)); err != nil {
 			log.Fatal(err)
 		}
 		return

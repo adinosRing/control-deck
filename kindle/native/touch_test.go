@@ -3,8 +3,11 @@ package main
 import (
 	"image"
 	"image/color"
+	"strings"
 	"testing"
 	"time"
+
+	"golang.org/x/image/font"
 )
 
 func TestConnectedDashboardUsesFixedPanels(t *testing.T) {
@@ -19,7 +22,11 @@ func TestConnectedDashboardUsesFixedPanels(t *testing.T) {
 		model.youtube = &youtubeVideo{Title: "Test track", Duration: 180, Playing: true}
 		frame := art.render(model, now)
 		original := art.backdrops[name]
-		for _, panel := range []image.Rectangle{image.Rect(9, 332, 382, 457), image.Rect(9, 466, 591, 667)} {
+		// Panel frames and headings stay exactly as drawn in the backdrop.
+		for _, panel := range []image.Rectangle{
+			image.Rect(9, 332, 382, 358), image.Rect(389, 91, 528, 122), image.Rect(389, 451, 591, 458),
+			image.Rect(9, 466, 591, 500), image.Rect(9, 655, 591, 667),
+		} {
 			for y := panel.Min.Y; y < panel.Max.Y; y++ {
 				for x := panel.Min.X; x < panel.Max.X; x++ {
 					expected := color.GrayModel.Convert(original.At(x, y)).(color.Gray)
@@ -28,6 +35,106 @@ func TestConnectedDashboardUsesFixedPanels(t *testing.T) {
 					}
 				}
 			}
+		}
+	}
+}
+
+func TestConnectedDashboardShowsLiveStats(t *testing.T) {
+	art, err := openArtwork()
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now()
+	cpu, ram, battery, plugged := 12, 91, 40, true
+	model := newDashboard("dark", now)
+	model.connectedUI, model.pcOnline = true, true
+	offline := art.render(model, now)
+	model.stats = &pcStats{CPU: &cpu, RAM: &ram, Battery: &battery, Plugged: &plugged}
+	model.stats.History.CPU = []int{0, 50, 100}
+	live := art.render(model, now)
+	changed := func(area image.Rectangle) bool {
+		for y := area.Min.Y; y < area.Max.Y; y++ {
+			for x := area.Min.X; x < area.Max.X; x++ {
+				if offline.GrayAt(x, y) != live.GrayAt(x, y) {
+					return true
+				}
+			}
+		}
+		return false
+	}
+	for name, area := range map[string]image.Rectangle{
+		"CPU gauge": image.Rect(35, 527, 111, 603), "CPU sparkline": image.Rect(28, 619, 117, 653),
+		"RAM gauge": image.Rect(248, 527, 324, 603), "battery": image.Rect(449, 501, 584, 562),
+	} {
+		if !changed(area) {
+			t.Errorf("%s did not show the live value", name)
+		}
+	}
+	if changed(image.Rect(141, 527, 217, 603)) {
+		t.Error("GPU gauge changed although the PC reported no GPU")
+	}
+}
+
+func TestDateFollowsTheDay(t *testing.T) {
+	art, err := openArtwork()
+	if err != nil {
+		t.Fatal(err)
+	}
+	friday := time.Date(2026, 11, 27, 9, 41, 0, 0, time.Local)
+	thursday := time.Date(2026, 12, 3, 22, 7, 0, 0, time.Local)
+	model := newDashboard("dark", friday)
+	first, second := art.render(model, friday), art.render(model, thursday)
+	for name, area := range map[string]image.Rectangle{
+		"day": image.Rect(30, 390, 102, 442), "weekday": image.Rect(118, 364, 374, 401), "month": image.Rect(29, 368, 103, 390),
+	} {
+		same := true
+		for y := area.Min.Y; y < area.Max.Y && same; y++ {
+			for x := area.Min.X; x < area.Max.X; x++ {
+				if first.GrayAt(x, y) != second.GrayAt(x, y) {
+					same = false
+					break
+				}
+			}
+		}
+		if same {
+			t.Errorf("%s did not change with the date", name)
+		}
+	}
+}
+
+func TestTodoTapSendsTheTappedTask(t *testing.T) {
+	now := time.Now()
+	model := newDashboard("dark", now)
+	model.connectedUI, model.pcOnline = true, true
+	model.todo = &todoList{Items: []todoItem{{Line: 0, Text: "first"}, {Line: 4, Text: "second task"}}, Total: 2}
+	model.tap(image.Pt(480, todoTop+todoRowHeight+20), now)
+	if model.pending == nil || model.pending.Action != "todo-toggle" || model.pending.Value != 4 || model.pending.Text != "second task" {
+		t.Fatalf("unexpected action %+v", model.pending)
+	}
+	model.pending = nil
+	model.tap(image.Pt(480, todoTop+5*todoRowHeight+20), now)
+	if model.pending != nil {
+		t.Fatalf("tapping an empty row sent %+v", model.pending)
+	}
+	model.pcOnline = false
+	model.tap(image.Pt(480, todoTop+20), now)
+	if model.pending != nil {
+		t.Fatalf("tapping while offline sent %+v", model.pending)
+	}
+}
+
+func TestTodoWrapsLongTasks(t *testing.T) {
+	art, err := openArtwork()
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines := wrapTwoLines(art.week, "Write the operating systems group project report and send it to everyone", todoTextWidth)
+	if len(lines) != 2 || !strings.HasSuffix(lines[1], "...") {
+		t.Fatalf("unexpected wrap %q", lines)
+	}
+	for _, line := range lines {
+		if width := font.MeasureString(art.week, line).Ceil(); width > todoTextWidth {
+			t.Fatalf("%q is %d px wide", line, width)
 		}
 	}
 }
@@ -88,5 +195,32 @@ func TestDashboardControlsAndRender(t *testing.T) {
 	model.tap(image.Pt(542, 59), now)
 	if exit, _ := model.tap(image.Pt(165, 460), now); !exit {
 		t.Fatal("exit confirmation ignored")
+	}
+}
+
+func TestViewportFitsPaperwhite(t *testing.T) {
+	w, h, ok := parseFBInkState("FBInk 1.25 ... viewWidth=1072;viewHeight=1448;screenWidth=1088;screenHeight=1448;")
+	if !ok || w != 1072 || h != 1448 {
+		t.Fatalf("parsed %d x %d %v", w, h, ok)
+	}
+	view := newViewport(w, h)
+	art, err := openArtwork()
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now()
+	frame := view.fit(art.render(newDashboard("dark", now), now), dark.paper)
+	if frame.Bounds() != image.Rect(0, 0, 1072, 1448) {
+		t.Fatalf("frame is %v", frame.Bounds())
+	}
+	// A tap in the middle of the EXIT button lands on EXIT in dashboard coordinates.
+	exitOnScreen := image.Pt(view.offX+int(545*view.scale), view.offY+int(60*view.scale))
+	panel := image.Pt(exitOnScreen.X*width/w, exitOnScreen.Y*height/h)
+	got := view.fromTouch(panel)
+	if got.X < 538 || got.X > 552 || got.Y < 54 || got.Y > 66 {
+		t.Fatalf("EXIT tap mapped to %v", got)
+	}
+	if native := newViewport(600, 800); !native.native() || native.fromTouch(image.Pt(10, 20)) != image.Pt(10, 20) {
+		t.Fatal("600x800 screens must be unchanged")
 	}
 }
