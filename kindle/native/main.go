@@ -58,11 +58,13 @@ type dashboard struct {
 	youtube                             *youtubeVideo
 	stats                               *pcStats
 	todo                                *todoList
+	kindleBattery                       int // -1 when unknown
+	kindleCharging                      bool
 	pending                             *bridgeAction
 }
 
 func newDashboard(pref string, now time.Time) *dashboard {
-	model := &dashboard{theme: dark, elapsed: 102, volume: 80, lastVolume: 80, playing: true, updated: now}
+	model := &dashboard{theme: dark, elapsed: 102, volume: 80, lastVolume: 80, playing: true, updated: now, kindleBattery: -1}
 	if pref == light.name {
 		model.theme = light
 	}
@@ -298,6 +300,9 @@ func (a *artwork) draw(d *dashboard, now time.Time) *canvas {
 	rectangle(img, 12, 5, 266, 31, t.paper)
 	textAt(img, a.small, 17, 22, now.Format("3:04 PM"), t.ink)
 	textAt(img, a.small, 109, 22, strings.ToUpper(now.Format("Mon, Jan 2")), t.ink)
+	if d.kindleBattery >= 0 {
+		a.drawKindleBattery(img, t, d.kindleBattery, d.kindleCharging)
+	}
 
 	song := tracks[d.track]
 	position, volume := d.elapsed, d.volume
@@ -429,6 +434,8 @@ func main() {
 	bridgeCheck := flag.String("bridge-check", "", "test pairing from the given directory")
 	previewStats := flag.String("preview-stats", "", "JSON file of PC stats to show in a PNG preview")
 	previewTodo := flag.String("preview-todo", "", "JSON file of a to-do list to show in a PNG preview")
+	previewBattery := flag.Int("battery", -1, "Kindle battery level to show in a PNG preview")
+	previewCharging := flag.Bool("charging", false, "show the Kindle as charging in a PNG preview")
 	previewScreen := flag.String("screen", "600x800", "screen size for a PNG preview, e.g. 1072x1448 for a Paperwhite 3")
 	flag.Parse()
 	if *bridgeCheck != "" {
@@ -455,6 +462,7 @@ func main() {
 			log.Fatal(err)
 		}
 		model := newDashboard(*previewTheme, now)
+		model.kindleBattery, model.kindleCharging = *previewBattery, *previewCharging
 		if *previewStats != "" {
 			raw, err := os.ReadFile(*previewStats)
 			if err != nil {

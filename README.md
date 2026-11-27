@@ -7,6 +7,7 @@
 > - **TO-DO panel** (replaces the big clock): tasks come from `companion/todo.txt` on the PC, and tapping a task on the Kindle ticks it off in the file.
 > - **TODAY panel** (replaces Codex Limits): the date, ISO week and day of the year.
 > - **Sharp on any screen size**: everything is drawn natively at the Kindle's real resolution (fonts, lines, gauges and 2× background artwork), so it fills a Kindle Paperwhite 3 (1072×1448) without blur, and taps are mapped to match.
+> - **Cleaner look and a real battery**: single-line panel frames instead of double borders, and the status bar shows the Kindle's actual battery level and charging state.
 > - **One-click Windows setup** (`Setup.bat`): installs the packages, pairs over Wi-Fi and the USB cable, and copies the files to the Kindle. Pairing no longer needs OpenSSL.
 > - **Ethernet over USB** for older Kindles: see the [Paperwhite 3 / USB guide](docs/paperwhite3-usb.md).
 

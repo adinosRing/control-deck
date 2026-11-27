@@ -13,6 +13,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -124,6 +125,31 @@ func paint(ctx context.Context, fbink, path string, frame image.Image, flash boo
 	return nil
 }
 
+// readKindleBattery asks the Kindle's power daemon for the charge level and charging state.
+func readKindleBattery(ctx context.Context) (int, bool, bool) {
+	get := func(property string) (int, error) {
+		probe, stop := context.WithTimeout(ctx, 3*time.Second)
+		defer stop()
+		output, err := exec.CommandContext(probe, "lipc-get-prop", "com.lab126.powerd", property).Output()
+		if err != nil {
+			return 0, err
+		}
+		return strconv.Atoi(strings.TrimSpace(string(output)))
+	}
+	level, err := get("battLevel")
+	if err != nil {
+		return 0, false, false
+	}
+	charging, _ := get("isCharging")
+	return level, charging == 1, true
+}
+
+func (d *dashboard) refreshBattery(ctx context.Context) {
+	if level, charging, ok := readKindleBattery(ctx); ok {
+		d.kindleBattery, d.kindleCharging = level, charging
+	}
+}
+
 // screenViewport asks FBInk for the real screen size so the dashboard fills
 // larger screens such as the Paperwhite's 1072 × 1448 panel.
 func screenViewport(ctx context.Context, fbink string) viewport {
@@ -203,6 +229,7 @@ func runDevice(model *dashboard, preference string) error {
 	if err != nil {
 		return err
 	}
+	model.refreshBattery(ctx)
 	if err := paint(ctx, fbink, framePath, view.fit(art.render(model, time.Now()), model.theme.paper), true); err != nil {
 		return err
 	}
@@ -216,6 +243,7 @@ func runDevice(model *dashboard, preference string) error {
 			return nil
 		case <-minute.C:
 			minute.Reset(time.Until(time.Now().Truncate(time.Minute).Add(time.Minute)))
+			model.refreshBattery(ctx)
 		case update := <-updates:
 			wasOnline, wasBrowserReady := model.pcOnline, model.browserReady
 			model.pcOnline = update.err == nil

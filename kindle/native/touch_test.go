@@ -227,3 +227,30 @@ func TestViewportFitsPaperwhite(t *testing.T) {
 		t.Fatal("600x800 screens must be unchanged")
 	}
 }
+
+func TestStatusBarShowsKindleBattery(t *testing.T) {
+	art, err := openArtwork(1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now()
+	model := newDashboard("dark", now)
+	sample := art.render(model, now)
+	model.kindleBattery = 12
+	low := art.render(model, now)
+	model.kindleBattery = 95
+	high := art.render(model, now)
+	differs := func(a, b *image.Gray, area image.Rectangle) bool {
+		for y := area.Min.Y; y < area.Max.Y; y++ {
+			for x := area.Min.X; x < area.Max.X; x++ {
+				if a.GrayAt(x, y) != b.GrayAt(x, y) {
+					return true
+				}
+			}
+		}
+		return false
+	}
+	if !differs(sample, low, image.Rect(505, 5, 590, 30)) || !differs(low, high, image.Rect(556, 12, 580, 24)) {
+		t.Fatal("status bar did not show the real battery level")
+	}
+}

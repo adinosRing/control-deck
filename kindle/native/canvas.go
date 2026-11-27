@@ -1,10 +1,12 @@
 package main
 
 import (
+	"fmt"
 	"image"
 	"image/color"
 	"image/draw"
 	"math"
+	"sort"
 
 	"golang.org/x/image/font"
 	"golang.org/x/image/math/fixed"
@@ -109,4 +111,42 @@ func (a *artwork) fitText(face font.Face, value string, width int) string {
 		}
 	}
 	return ""
+}
+
+// drawKindleBattery replaces the sample battery in the status bar with the Kindle's real charge.
+func (a *artwork) drawKindleBattery(c *canvas, t theme, level int, charging bool) {
+	level = max(0, min(100, level))
+	rectangle(c, 505, 5, 590, 30, t.paper)
+	rightText(c, a.small, 547, 22, fmt.Sprintf("%d%%", level), t.ink)
+	// Battery body, terminal nub and charge level.
+	outline(c, image.Rect(556, 12, 577, 24), t.ink)
+	rectangle(c, 577, 15, 580, 21, t.ink)
+	rectangle(c, 558, 14, 558+17*level/100, 22, t.ink)
+	if charging {
+		// While charging, show a clear lightning bolt; the percentage still gives the level.
+		rectangle(c, 558, 14, 575, 22, t.paper)
+		c.polygon([][2]float64{{568.5, 12.5}, {562, 18.6}, {566, 18.6}, {564.5, 23.5}, {571.5, 17.2}, {567.4, 17.2}, {569.5, 12.5}}, t.ink)
+	}
+}
+
+// polygon fills a closed shape given in logical coordinates, at device resolution.
+func (c *canvas) polygon(points [][2]float64, ink color.Gray) {
+	minY, maxY := math.Inf(1), math.Inf(-1)
+	for _, p := range points {
+		minY, maxY = math.Min(minY, p[1]), math.Max(maxY, p[1])
+	}
+	for py := int(math.Floor(minY * c.scale)); py <= int(math.Ceil(maxY*c.scale)); py++ {
+		y := (float64(py) + .5) / c.scale
+		var xs []float64
+		for i := range points {
+			p, q := points[i], points[(i+1)%len(points)]
+			if (p[1] <= y) != (q[1] <= y) {
+				xs = append(xs, p[0]+(y-p[1])/(q[1]-p[1])*(q[0]-p[0]))
+			}
+		}
+		sort.Float64s(xs)
+		for i := 0; i+1 < len(xs); i += 2 {
+			c.fillPx(image.Rect(int(math.Round(xs[i]*c.scale)), py, int(math.Round(xs[i+1]*c.scale)), py+1), ink)
+		}
+	}
 }
