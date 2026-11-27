@@ -127,15 +127,43 @@ def find_browser():
     return None
 
 
-def find_claude():
+def start_app_id(name):
+    """The Start menu ID of an installed app (Store/MSIX apps included), via Get-StartApps."""
+    try:
+        result = subprocess.run(
+            ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command",
+             "Get-StartApps | Where-Object { $_.Name -eq $env:CD_APP } | Select-Object -First 1 -ExpandProperty AppID"],
+            capture_output=True, text=True, timeout=8, env={**os.environ, "CD_APP": name},
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    app_id = result.stdout.strip()
+    return app_id or None
+
+
+def open_first(targets):
+    """Open the first target that Windows accepts; stale shortcuts are skipped."""
+    for target in targets:
+        if not target:
+            continue
+        try:
+            os.startfile(str(target))
+            return True
+        except OSError as exc:
+            LOG.info("Could not open %s: %s", target, exc)
+    return False
+
+
+def claude_targets():
     local = Path(os.environ.get("LOCALAPPDATA", ""))
-    shortcut = start_menu_shortcut("Claude")
-    if shortcut:
-        return shortcut
+    app_id = start_app_id("Claude")
+    yield f"shell:AppsFolder\\{app_id}" if app_id else None
     for candidate in (local / "AnthropicClaude" / "claude.exe", local / "Programs" / "Claude" / "Claude.exe"):
-        if candidate.is_file():
-            return candidate
-    return None
+        yield candidate if candidate.is_file() else None
+    yield start_menu_shortcut("Claude")
+    yield "claude://"
+    yield "https://claude.ai/"
 
 
 def find_vscode():
@@ -171,8 +199,8 @@ def launch(name):
             else:
                 os.startfile(f"steam://rungameid/{CYBERPUNK_STEAM_APP}")
         elif name == "Claude":
-            app = find_claude()
-            os.startfile(str(app) if app else "https://claude.ai/")
+            if not open_first(claude_targets()):
+                raise ActionUnavailable("Windows could not open Claude.")
         elif name == "VS Code":
             app = find_vscode()
             if not app:
