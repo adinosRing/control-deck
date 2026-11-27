@@ -176,13 +176,18 @@ input[type="range"]::-moz-range-thumb { width: 10px; height: 11px; border: 1px s
 .volume input::-moz-range-thumb { opacity: 0; }
 
 .today h2 { flex-basis: 24px; }
-.today-body { display: grid; grid-template-columns: 76px minmax(0, 1fr); align-items: center; gap: 16px; padding: 2px 12px; }
+.today-body { display: grid; grid-template-columns: 76px minmax(0, 1fr) 94px; align-items: center; gap: 16px; padding: 2px 12px; }
 .day-box { display: flex; flex-direction: column; width: 76px; height: 76px; border: 2px solid var(--frame); border-radius: 5px; overflow: hidden; text-align: center; }
 .day-box span { background: var(--frame); color: var(--panel); font: 700 15px Pixelify, monospace; line-height: 20px; letter-spacing: 1px; }
 .day-box b { flex: 1; display: grid; place-items: center; font: 700 40px Pixelify, monospace; line-height: 1; }
 .today-text { min-width: 0; white-space: nowrap; }
-.today-text h3 { font-size: 32px; font-weight: 700; line-height: 1.1; }
-.today-text p { font-size: 15px; margin-top: 3px; }
+.today-text h3 { font-size: 27px; font-weight: 700; line-height: 1.1; }
+.today-text p { font-size: 14px; margin-top: 3px; }
+.weather { align-self: stretch; display: flex; flex-direction: column; justify-content: center; margin-left: -8px; padding-left: 9px; border-left: 1px dotted var(--line); white-space: nowrap; overflow: hidden; }
+.weather-now { display: flex; align-items: center; gap: 6px; }
+.weather-now b { font: 700 27px Pixelify, monospace; line-height: 1; }
+.weather p { font-size: 12px; margin-top: 3px; }
+.weather .weather-range, .weather .weather-place { color: var(--muted); }
 .today-text .today-week { font-size: 13px; color: var(--muted); border-top: 1px dotted var(--line); padding-top: 5px; margin-top: 6px; }
 
 .performance-body { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)) minmax(0, 1.27fr); padding: 6px 4px 5px; }

@@ -18,6 +18,7 @@ sys.path.insert(0, str(HERE / "vendor"))
 from browser_link import BrowserLink, BrowserUnavailable
 from pc_stats import PCStats
 from todo import TodoFile, TodoUnavailable
+from weather import Weather
 
 LOG = logging.getLogger("kindle-dashboard")
 
@@ -86,7 +87,8 @@ class BridgeHandler(BaseHTTPRequestHandler):
                 except BrowserUnavailable:
                     video = None
                 self.send_json(200, {"youtube": video, "browser_ready": link.ready(), "stats": self.server.stats.snapshot(),
-                                     "todo": self.server.todo.snapshot()})
+                                     "todo": self.server.todo.snapshot(),
+                                     "weather": self.server.weather.snapshot()})
             else:
                 self.send_json(404, {"error": "Unknown dashboard request."})
 
@@ -158,6 +160,7 @@ def main():
         server.browser = browser
         server.stats = PCStats().start()
         server.todo = TodoFile(args.todo)
+        server.weather = Weather(HERE / "weather-location.txt").start()
         LOG.info("To-do list: %s", args.todo.resolve())
         browser_server = browser.listen()
         server.authorization = ("Bearer " + config["token"]).encode("ascii")

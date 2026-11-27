@@ -58,6 +58,7 @@ type dashboard struct {
 	youtube                             *youtubeVideo
 	stats                               *pcStats
 	todo                                *todoList
+	weather                             *weatherInfo
 	kindleBattery                       int // -1 when unknown
 	kindleCharging                      bool
 	pending                             *bridgeAction
@@ -128,7 +129,7 @@ func (d *dashboard) tap(point image.Point, now time.Time) (exit, flash bool) {
 			return false, true
 		case x >= 446 && x < 490:
 			if d.connectedUI {
-				d.show("CONTROL DECK", "Quick Launch, YouTube, the PC performance monitor and the to-do list use the PC companion. Tap a task to tick it off in todo.txt.")
+				d.show("CONTROL DECK", "Quick Launch, YouTube, the PC monitor, weather and the to-do list come from the PC companion. Tap a task to tick it off in todo.txt.")
 			} else {
 				d.show("CONTROL DECK", "Offline dashboard for Kindle. Music, PC stats, tasks and shortcuts use sample data.")
 			}
@@ -198,6 +199,7 @@ type artwork struct {
 	sources, backdrops                     map[string]image.Image
 	title, label, body, small, tiny        font.Face
 	day, weekday, month, count, date, week font.Face
+	weekdaySmall                           font.Face
 }
 
 // openArtwork loads the fonts and artwork for a screen scale (1 = 600 × 800).
@@ -227,9 +229,9 @@ func openArtwork(scale float64) (*artwork, error) {
 	}{
 		{"pixelify.ttf", 25, &art.title}, {"pixelify.ttf", 16, &art.label},
 		{"plex-mono.ttf", 16, &art.body}, {"plex-mono.ttf", 14, &art.small}, {"plex-mono.ttf", 12, &art.tiny},
-		{"pixelify.ttf", 40, &art.day}, {"pixelify.ttf", 32, &art.weekday},
+		{"pixelify.ttf", 40, &art.day}, {"pixelify.ttf", 27, &art.weekday}, {"pixelify.ttf", 23, &art.weekdaySmall},
 		{"pixelify.ttf", 15, &art.month}, {"pixelify.ttf", 17, &art.count},
-		{"plex-mono.ttf", 15, &art.date}, {"plex-mono.ttf", 13, &art.week},
+		{"plex-mono.ttf", 14, &art.date}, {"plex-mono.ttf", 13, &art.week},
 	} {
 		data, err := assets.ReadFile("assets/" + item.file)
 		if err != nil {
@@ -385,6 +387,7 @@ func (a *artwork) draw(d *dashboard, now time.Time) *canvas {
 		}
 		a.drawStats(img, t, stats)
 		a.drawTodo(img, t, d.todo, d.pcOnline)
+		a.drawWeather(img, t, d.weather, d.pcOnline)
 	}
 
 	if d.dialogTitle != "" {
@@ -434,6 +437,7 @@ func main() {
 	bridgeCheck := flag.String("bridge-check", "", "test pairing from the given directory")
 	previewStats := flag.String("preview-stats", "", "JSON file of PC stats to show in a PNG preview")
 	previewTodo := flag.String("preview-todo", "", "JSON file of a to-do list to show in a PNG preview")
+	previewWeather := flag.String("preview-weather", "", "JSON file of weather to show in a PNG preview")
 	previewBattery := flag.Int("battery", -1, "Kindle battery level to show in a PNG preview")
 	previewCharging := flag.Bool("charging", false, "show the Kindle as charging in a PNG preview")
 	previewScreen := flag.String("screen", "600x800", "screen size for a PNG preview, e.g. 1072x1448 for a Paperwhite 3")
@@ -447,7 +451,15 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		fmt.Printf("PC connected, browser extension: %t, YouTube video: %t, PC stats: %t\n", reply.BrowserReady, reply.YouTube != nil, reply.Stats != nil)
+		weather := "none"
+		if reply.Weather != nil {
+			weather = "ok"
+			if reply.Weather.Error != "" {
+				weather = "error: " + reply.Weather.Error
+			}
+		}
+		fmt.Printf("PC connected, browser extension: %t, YouTube video: %t, PC stats: %t, to-do: %t, weather: %s\n",
+			reply.BrowserReady, reply.YouTube != nil, reply.Stats != nil, reply.Todo != nil, weather)
 		return
 	}
 	now := time.Now()
@@ -470,6 +482,16 @@ func main() {
 			}
 			model.connectedUI, model.pcOnline, model.browserReady = true, true, true
 			if err := json.Unmarshal(raw, &model.stats); err != nil {
+				log.Fatal(err)
+			}
+		}
+		if *previewWeather != "" {
+			raw, err := os.ReadFile(*previewWeather)
+			if err != nil {
+				log.Fatal(err)
+			}
+			model.connectedUI, model.pcOnline = true, true
+			if err := json.Unmarshal(raw, &model.weather); err != nil {
 				log.Fatal(err)
 			}
 		}

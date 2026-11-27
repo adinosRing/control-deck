@@ -254,3 +254,35 @@ func TestStatusBarShowsKindleBattery(t *testing.T) {
 		t.Fatal("status bar did not show the real battery level")
 	}
 }
+
+func TestTodayTextFitsBesideWeather(t *testing.T) {
+	// Check at both the original size and a Paperwhite 3's, since font widths round differently.
+	for _, screen := range [][2]int{{600, 800}, {1072, 1448}} {
+		view := newViewport(screen[0], screen[1])
+		art, err := openArtwork(view.scale)
+		if err != nil {
+			t.Fatal(err)
+		}
+		c := &canvas{scale: view.scale}
+		// The longest weekday and date must stay clear of the weather column (dotted divider at x≈261).
+		wednesday := time.Date(2026, 9, 30, 12, 0, 0, 0, time.Local)
+		model := newDashboard("dark", wednesday)
+		model.connectedUI, model.pcOnline = true, true
+		temp, code := 24.0, 2
+		model.weather = &weatherInfo{Temp: &temp, Code: &code, IsDay: true, Place: "Bengaluru"}
+		frame := art.render(model, wednesday)
+		for y := c.px(364); y < c.px(449); y++ {
+			for x := c.px(258); x < c.px(260); x++ {
+				// Only ink the app drew counts; the artwork's own soft edges are fine.
+				if got := frame.GrayAt(x, y); got != dark.panel && got != art.backdrop("dark").At(x, y) {
+					t.Fatalf("%dx%d: date text reaches the weather column at (%d,%d)", screen[0], screen[1], x, y)
+				}
+			}
+		}
+		for _, label := range []string{"PARTLY CLOUDY", "THUNDERSTORM", "MOSTLY CLEAR"} {
+			if got := art.fitText(art.tiny, label, 102); got != label {
+				t.Errorf("%dx%d: %q was shortened to %q", screen[0], screen[1], label, got)
+			}
+		}
+	}
+}

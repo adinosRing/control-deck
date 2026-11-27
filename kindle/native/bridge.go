@@ -28,6 +28,7 @@ type bridgeReply struct {
 	YouTube      *youtubeVideo
 	Stats        *pcStats
 	Todo         *todoList
+	Weather      *weatherInfo
 	BrowserReady bool `json:"browser_ready"`
 	OK           bool
 	Error        string

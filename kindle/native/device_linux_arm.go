@@ -249,12 +249,13 @@ func runDevice(model *dashboard, preference string) error {
 			model.pcOnline = update.err == nil
 			if update.action == nil {
 				model.browserReady = update.reply.BrowserReady
-				if wasOnline == model.pcOnline && wasBrowserReady == model.browserReady && reflect.DeepEqual(model.youtube, update.reply.YouTube) && reflect.DeepEqual(model.stats, update.reply.Stats) && reflect.DeepEqual(model.todo, update.reply.Todo) {
+				if wasOnline == model.pcOnline && wasBrowserReady == model.browserReady && reflect.DeepEqual(model.youtube, update.reply.YouTube) && reflect.DeepEqual(model.stats, update.reply.Stats) && reflect.DeepEqual(model.todo, update.reply.Todo) && reflect.DeepEqual(model.weather, update.reply.Weather) {
 					continue
 				}
 				model.youtube = update.reply.YouTube
 				model.stats = update.reply.Stats
 				model.todo = update.reply.Todo
+				model.weather = update.reply.Weather
 			} else if update.err != nil {
 				model.show("PC OFFLINE", "Connect the Kindle and PC to the same local network and start the PC companion. Then try again.")
 			} else if update.reply.Error != "" {

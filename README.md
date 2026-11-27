@@ -5,7 +5,7 @@
 > **What this fork adds**
 > - **Live PC Performance Monitor**: CPU, GPU, RAM, VRAM, battery and network speed from the Windows companion (`psutil`, plus `nvidia-smi` for NVIDIA GPUs), drawn as gauges and sparklines.
 > - **TO-DO panel** (replaces the big clock): tasks come from `companion/todo.txt` on the PC, and tapping a task on the Kindle ticks it off in the file.
-> - **TODAY panel** (replaces Codex Limits): the date, ISO week and day of the year.
+> - **TODAY panel** (replaces Codex Limits): the date, ISO week and day of the year, plus **live weather** (icon, temperature, conditions, high/low) from [Open-Meteo](https://open-meteo.com/), fetched by the PC companion. Set your city in `companion/weather-location.txt`, or leave it empty to detect it automatically.
 > - **Sharp on any screen size**: everything is drawn natively at the Kindle's real resolution (fonts, lines, gauges and 2× background artwork), so it fills a Kindle Paperwhite 3 (1072×1448) without blur, and taps are mapped to match.
 > - **Cleaner look and a real battery**: single-line panel frames instead of double borders, and the status bar shows the Kindle's actual battery level and charging state.
 > - **One-click Windows setup** (`Setup.bat`): installs the packages, pairs over Wi-Fi and the USB cable, and copies the files to the Kindle. Pairing no longer needs OpenSSL.
