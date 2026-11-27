@@ -58,21 +58,24 @@ func gray(a, b color.Gray, mix float64) color.Gray {
 	return color.Gray{uint8(math.Round(float64(a.Y)*(1-mix) + float64(b.Y)*mix))}
 }
 
-// drawGauge paints the ring with 4 × 4 supersampling so the edges stay smooth on e-ink.
-func drawGauge(img *image.Gray, t theme, cx, cy float64, value *int) {
+// drawGauge paints the ring at device resolution with 4 × 4 supersampling so the edges stay smooth on e-ink.
+func drawGauge(c *canvas, t theme, cx, cy float64, value *int) {
 	sweep := -1.0
 	if value != nil {
 		sweep = float64(clampPercent(*value)) / 100 * 2 * math.Pi
 	}
-	for y := int(cy - gaugeOuter - 1); y <= int(cy+gaugeOuter+1); y++ {
-		for x := int(cx - gaugeOuter - 1); x <= int(cx+gaugeOuter+1); x++ {
+	s := c.scale
+	pcx, pcy := cx*s, cy*s
+	inner, outer := gaugeInner*s, gaugeOuter*s
+	for y := int(pcy - outer - 1); y <= int(pcy+outer+1); y++ {
+		for x := int(pcx - outer - 1); x <= int(pcx+outer+1); x++ {
 			var filled, track int
 			for sy := 0; sy < 4; sy++ {
 				for sx := 0; sx < 4; sx++ {
-					dx := float64(x) + (float64(sx)+.5)/4 - cx
-					dy := float64(y) + (float64(sy)+.5)/4 - cy
+					dx := float64(x) + (float64(sx)+.5)/4 - pcx
+					dy := float64(y) + (float64(sy)+.5)/4 - pcy
 					d := math.Hypot(dx, dy)
-					if d < gaugeInner || d >= gaugeOuter {
+					if d < inner || d >= outer {
 						continue
 					}
 					// Angle measured clockwise from 12 o'clock.
@@ -92,58 +95,62 @@ func drawGauge(img *image.Gray, t theme, cx, cy float64, value *int) {
 			}
 			ink := gray(t.panel, t.frame, float64(filled)/16)
 			ink = gray(ink, t.track, float64(track)/16)
-			img.SetGray(x, y, ink)
+			c.img.SetGray(x, y, ink)
 		}
 	}
 }
 
-// drawSpark fills the area under the history line, adds the dotted texture and strokes the line.
-func drawSpark(img *image.Gray, t theme, left, right int, points []int) {
-	x0, x1 := left+1, right-1
-	y0, y1 := sparkTop+1, sparkBottom-1
-	rectangle(img, x0, y0, x1+1, y1+1, t.panel)
+// drawSpark fills the area under the history line, adds the dotted texture and strokes the line,
+// all at device resolution.
+func drawSpark(c *canvas, t theme, left, right int, points []int) {
+	rectangle(c, left+1, sparkTop+1, right, sparkBottom, t.panel)
 	if len(points) < 2 {
 		return
 	}
+	x0, x1 := c.px(float64(left+1)), c.px(float64(right))-1
+	y0, y1 := c.px(float64(sparkTop+1)), c.px(float64(sparkBottom))-1
+	u := c.unit()
 	w, h := float64(x1-x0), float64(y1-y0)
 	lineY := func(x int) float64 {
 		pos := float64(x-x0) / w * float64(len(points)-1)
 		i := min(int(pos), len(points)-2)
 		frac := pos - float64(i)
 		v := float64(clampPercent(points[i]))*(1-frac) + float64(clampPercent(points[i+1]))*frac
-		return float64(y0) + h - 1 - v/100*(h-2)
+		return float64(y0) + h - float64(u) - v/100*(h-2*float64(u))
 	}
 	prev := lineY(x0)
 	for x := x0; x <= x1; x++ {
 		ly := lineY(x)
 		for y := int(math.Ceil(ly)); y <= y1; y++ {
 			ink := t.shade
-			if (y-y0)%3 == 2 && (x-x0+((y-y0)/3%2)*2)%4 == 0 {
+			// Dotted texture in logical-pixel-sized dots.
+			gx, gy := (x-x0)/u, (y-y0)/u
+			if gy%3 == 2 && (gx+(gy/3%2)*2)%4 == 0 {
 				ink = t.track
 			}
-			img.SetGray(x, y, ink)
+			c.img.SetGray(x, y, ink)
 		}
 		top, bottom := math.Min(prev, ly), math.Max(prev, ly)
-		for y := int(math.Floor(top)); y <= int(math.Ceil(bottom)) && y <= y1; y++ {
+		for y := int(math.Floor(top)); y <= int(math.Ceil(bottom))+u-1 && y <= y1; y++ {
 			if y >= y0 {
-				img.SetGray(x, y, t.frame)
+				c.img.SetGray(x, y, t.frame)
 			}
 		}
 		prev = ly
 	}
 }
 
-func centerText(img *image.Gray, face font.Face, cx float64, baseline int, value string, ink color.Gray) {
-	textAt(img, face, int(math.Round(cx))-font.MeasureString(face, value).Ceil()/2, baseline, value, ink)
+func centerText(c *canvas, face font.Face, cx float64, baseline int, value string, ink color.Gray) {
+	c.textPx(face, c.px(cx)-font.MeasureString(face, value).Ceil()/2, c.px(float64(baseline)), value, ink)
 }
 
-func rightText(img *image.Gray, face font.Face, right, baseline int, value string, ink color.Gray) {
-	textAt(img, face, right-font.MeasureString(face, value).Ceil(), baseline, value, ink)
+func rightText(c *canvas, face font.Face, right, baseline int, value string, ink color.Gray) {
+	c.textPx(face, c.px(float64(right))-font.MeasureString(face, value).Ceil(), c.px(float64(baseline)), value, ink)
 }
 
-func dottedLine(img *image.Gray, x0, x1, y int, ink color.Gray) {
+func dottedLine(c *canvas, x0, x1, y int, ink color.Gray) {
 	for x := x0; x <= x1; x += 2 {
-		img.SetGray(x, y, ink)
+		rectangle(c, x, y, x+1, y+1, ink)
 	}
 }
 
@@ -165,11 +172,11 @@ func capacity(used, total *float64) string {
 	if used == nil || total == nil {
 		return ""
 	}
-	return fmt.Sprintf("%.1f / %.1f GB", *used, *total)
+	return fmt.Sprintf("%.1f/%.1f GB", *used, *total)
 }
 
 // drawBattery draws a small vertical battery icon filled to the charge level.
-func drawBattery(img *image.Gray, t theme, x, y int, level *int, plugged bool) {
+func drawBattery(img *canvas, t theme, x, y int, level *int, plugged bool) {
 	outline(img, image.Rect(x, y+3, x+16, y+34), t.frame)
 	outline(img, image.Rect(x+1, y+4, x+15, y+33), t.frame)
 	rectangle(img, x+5, y, x+11, y+3, t.frame)
@@ -193,7 +200,7 @@ func drawBattery(img *image.Gray, t theme, x, y int, level *int, plugged bool) {
 
 // drawStats replaces the sample numbers baked into the backdrop with live PC values.
 // A nil stats value (PC offline) shows empty gauges and dashes.
-func (a *artwork) drawStats(img *image.Gray, t theme, s *pcStats) {
+func (a *artwork) drawStats(img *canvas, t theme, s *pcStats) {
 	if s == nil {
 		s = &pcStats{}
 	}
@@ -211,10 +218,10 @@ func (a *artwork) drawStats(img *image.Gray, t theme, s *pcStats) {
 		// Drawn twice, one pixel apart, to match the bold numbers in the artwork.
 		centerText(img, a.title, col.cx, 572, label, t.ink)
 		centerText(img, a.title, col.cx+1, 572, label, t.ink)
-		// Capacity line such as "21.8 / 32.0 GB".
+		// Capacity line such as "21.8/32.0 GB".
 		rectangle(img, col.left+1, 603, col.right, 617, t.panel)
 		if capacities[i] != "" {
-			centerText(img, a.tiny, col.cx, 614, fitText(a.tiny, capacities[i], col.right-col.left-4), t.ink)
+			centerText(img, a.tiny, col.cx, 614, a.fitText(a.tiny, capacities[i], col.right-col.left-4), t.ink)
 		}
 		drawSpark(img, t, col.sparkL, col.sparkR, histories[i])
 	}

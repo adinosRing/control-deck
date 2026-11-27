@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"image"
 	"image/color"
 	"strings"
 	"time"
@@ -20,28 +19,30 @@ const (
 	alignRight
 )
 
-// inkText draws value so that its visible ink sits at x (left edge or centre) with its lowest pixel row at bottom.
-// bold > 0 repeats the text that many pixels right and up to match the bold weight used in the artwork.
-func inkText(img *image.Gray, face font.Face, value string, align anchor, x float64, bottom int, ink color.Gray, bold int) {
+// inkText draws value so that its visible ink sits at x (left edge, centre or right edge) with its lowest
+// pixel row at bottom, both in logical pixels. bold > 0 repeats the text that many logical pixels to the right
+// to match the bold weight used in the artwork. Positions are worked out in device pixels, so it stays exact
+// at any scale.
+func inkText(c *canvas, face font.Face, value string, align anchor, x float64, bottom int, ink color.Gray, bold int) {
 	bounds, _ := font.BoundString(face, value)
 	minX, maxX := bounds.Min.X.Floor(), bounds.Max.X.Ceil()
-	left := int(x) - minX
+	boldPx := c.px(float64(bold))
+	left := c.px(x) - minX
 	switch align {
 	case alignCenter:
-		left = int(x+.5) - (minX+maxX+bold)/2
+		left = c.px(x+.5) - (minX+maxX+boldPx)/2
 	case alignRight:
-		left = int(x) + 1 - maxX - bold
+		left = c.px(x+1) - maxX - boldPx
 	}
-	baseline := bottom + 1 - bounds.Max.Y.Ceil() + bold
-	for dy := 0; dy <= bold; dy++ {
-		for dx := 0; dx <= bold; dx++ {
-			textAt(img, face, left+dx, baseline-dy, value, ink)
-		}
+	baseline := c.px(float64(bottom+1)) - bounds.Max.Y.Ceil()
+	// Thicken sideways only: shifting vertically too would close small gaps, turning a "2" into an "8".
+	for dx := 0; dx <= boldPx; dx++ {
+		c.textPx(face, left+dx, baseline, value, ink)
 	}
 }
 
 // drawToday fills the TODAY panel with the current date.
-func (a *artwork) drawToday(img *image.Gray, t theme, now time.Time) {
+func (a *artwork) drawToday(img *canvas, t theme, now time.Time) {
 	// TODAY panel: calendar tile, weekday, full date, ISO week and day of the year.
 	rectangle(img, 29, 368, 103, 390, t.frame)
 	inkText(img, a.month, strings.ToUpper(now.Format("Jan")), alignCenter, 65, 384, t.panel, 1)

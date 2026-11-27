@@ -18,9 +18,9 @@ import (
 	"strings"
 	"time"
 
+	xdraw "golang.org/x/image/draw"
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/opentype"
-	"golang.org/x/image/math/fixed"
 )
 
 const width, height = 600, 800
@@ -187,27 +187,36 @@ func (d *dashboard) tap(point image.Point, now time.Time) (exit, flash bool) {
 	return false, false
 }
 
+// The backdrops are rendered at twice the design size and scaled down to the
+// screen, so the artwork stays sharp on high-resolution Kindles.
+const backdropScale = 2
+
 type artwork struct {
-	backdrops                              map[string]image.Image
+	scale                                  float64
+	sources, backdrops                     map[string]image.Image
 	title, label, body, small, tiny        font.Face
 	day, weekday, month, count, date, week font.Face
 }
 
-func openArtwork() (*artwork, error) {
-	art := &artwork{backdrops: make(map[string]image.Image)}
+// openArtwork loads the fonts and artwork for a screen scale (1 = 600 × 800).
+func openArtwork(scale float64) (*artwork, error) {
+	if scale <= 0 {
+		scale = 1
+	}
+	art := &artwork{scale: scale, sources: make(map[string]image.Image), backdrops: make(map[string]image.Image)}
 	for _, name := range []string{dark.name, light.name} {
 		data, err := assets.ReadFile("assets/" + name + ".png")
 		if err != nil {
 			return nil, err
 		}
-		backdrop, err := png.Decode(bytes.NewReader(data))
+		source, err := png.Decode(bytes.NewReader(data))
 		if err != nil {
 			return nil, err
 		}
-		if backdrop.Bounds() != image.Rect(0, 0, width, height) {
-			return nil, fmt.Errorf("invalid %s backdrop dimensions", name)
+		if source.Bounds() != image.Rect(0, 0, width*backdropScale, height*backdropScale) {
+			return nil, fmt.Errorf("invalid %s backdrop dimensions %v", name, source.Bounds().Size())
 		}
-		art.backdrops[name] = backdrop
+		art.sources[name] = source
 	}
 	for _, item := range []struct {
 		file string
@@ -228,7 +237,7 @@ func openArtwork() (*artwork, error) {
 		if err != nil {
 			return nil, err
 		}
-		*item.dest, err = opentype.NewFace(parsed, &opentype.FaceOptions{Size: item.size, DPI: 72, Hinting: font.HintingFull})
+		*item.dest, err = opentype.NewFace(parsed, &opentype.FaceOptions{Size: item.size * scale, DPI: 72, Hinting: font.HintingFull})
 		if err != nil {
 			return nil, err
 		}
@@ -236,40 +245,25 @@ func openArtwork() (*artwork, error) {
 	return art, nil
 }
 
-func rectangle(img *image.Gray, x0, y0, x1, y1 int, ink color.Gray) {
-	draw.Draw(img, image.Rect(x0, y0, x1, y1), image.NewUniform(ink), image.Point{}, draw.Src)
-}
-
-func outline(img *image.Gray, rect image.Rectangle, ink color.Gray) {
-	x0, y0, x1, y1 := rect.Min.X, rect.Min.Y, rect.Max.X, rect.Max.Y
-	rectangle(img, x0, y0, x1, y0+1, ink)
-	rectangle(img, x0, y1-1, x1, y1, ink)
-	rectangle(img, x0, y0, x0+1, y1, ink)
-	rectangle(img, x1-1, y0, x1, y1, ink)
-}
-
-func textAt(img *image.Gray, face font.Face, x, baseline int, value string, ink color.Gray) {
-	drawer := font.Drawer{Dst: img, Src: image.NewUniform(ink), Face: face, Dot: fixed.P(x, baseline)}
-	drawer.DrawString(value)
+// backdrop returns the theme artwork at the canvas size, scaling it down from 2× once and caching it.
+func (a *artwork) backdrop(theme string) image.Image {
+	if cached, ok := a.backdrops[theme]; ok {
+		return cached
+	}
+	source := a.sources[theme]
+	w, h := scaledSize(a.scale)
+	var scaled image.Image = source
+	if source.Bounds().Size() != image.Pt(w, h) {
+		target := image.NewGray(image.Rect(0, 0, w, h))
+		xdraw.CatmullRom.Scale(target, target.Bounds(), source, source.Bounds(), xdraw.Src, nil)
+		scaled = target
+	}
+	a.backdrops[theme] = scaled
+	return scaled
 }
 
 func timestamp(seconds int) string {
 	return fmt.Sprintf("%d:%02d", seconds/60, seconds%60)
-}
-
-func fitText(face font.Face, value string, width int) string {
-	runes := []rune(value)
-	if font.MeasureString(face, value).Ceil() <= width {
-		return value
-	}
-	for len(runes) > 0 {
-		runes = runes[:len(runes)-1]
-		shortened := string(runes) + "..."
-		if font.MeasureString(face, shortened).Ceil() <= width {
-			return shortened
-		}
-	}
-	return ""
 }
 
 func connectedTap(point image.Point) *bridgeAction {
@@ -294,9 +288,13 @@ func connectedTap(point image.Point) *bridgeAction {
 }
 
 func (a *artwork) render(d *dashboard, now time.Time) *image.Gray {
+	return a.draw(d, now).img
+}
+
+func (a *artwork) draw(d *dashboard, now time.Time) *canvas {
 	t := d.theme
-	img := image.NewGray(image.Rect(0, 0, width, height))
-	draw.Draw(img, img.Bounds(), a.backdrops[t.name], image.Point{}, draw.Src)
+	img := newCanvas(a.scale)
+	draw.Draw(img.img, img.img.Bounds(), a.backdrop(t.name), image.Point{}, draw.Src)
 	rectangle(img, 12, 5, 266, 31, t.paper)
 	textAt(img, a.small, 17, 22, now.Format("3:04 PM"), t.ink)
 	textAt(img, a.small, 109, 22, strings.ToUpper(now.Format("Mon, Jan 2")), t.ink)
@@ -337,10 +335,10 @@ func (a *artwork) render(d *dashboard, now time.Time) *image.Gray {
 			}
 		}
 	}
-	rectangle(img, 154, 130, 163+font.MeasureString(a.label, status).Ceil(), 148, t.frame)
+	rectangle(img, 154, 130, 163+a.measure(a.label, status), 148, t.frame)
 	textAt(img, a.label, 158, 144, status, t.paper)
-	textAt(img, a.title, 154, 172, fitText(a.title, song.title, 210), t.ink)
-	textAt(img, a.body, 154, 192, fitText(a.body, song.artist, 210), t.ink)
+	textAt(img, a.title, 154, 172, a.fitText(a.title, song.title, 210), t.ink)
+	textAt(img, a.body, 154, 192, a.fitText(a.body, song.artist, 210), t.ink)
 	rectangle(img, 154, 217, 364, 219, t.frame)
 	length, elapsed := "--:--", "--:--"
 	if song.length > 0 {
@@ -350,14 +348,11 @@ func (a *artwork) render(d *dashboard, now time.Time) *image.Gray {
 		elapsed, length = timestamp(position), timestamp(song.length)
 	}
 	textAt(img, a.small, 154, 241, elapsed, t.ink)
-	textAt(img, a.small, 364-font.MeasureString(a.small, length).Ceil(), 241, length, t.ink)
+	textAt(img, a.small, 364-a.measure(a.small, length), 241, length, t.ink)
 
 	if !playing {
 		rectangle(img, 180, 256, 211, 278, t.panel)
-		for column := 0; column < 17; column++ {
-			halfHeight := (17 - column) * 9 / 17
-			rectangle(img, 189+column, 266-halfHeight, 190+column, 267+halfHeight, t.ink)
-		}
+		img.triangleRight(189, 206, 266.5, 9.5, t.ink)
 	}
 	if shuffle {
 		outline(img, image.Rect(35, 250, 80, 283), t.frame)
@@ -375,7 +370,7 @@ func (a *artwork) render(d *dashboard, now time.Time) *image.Gray {
 	if volume >= 0 {
 		level = fmt.Sprintf("%d%%", volume)
 	}
-	textAt(img, a.small, 358-font.MeasureString(a.small, level).Ceil(), 309, level, t.ink)
+	textAt(img, a.small, 358-a.measure(a.small, level), 309, level, t.ink)
 
 	a.drawToday(img, t, now)
 	if d.connectedUI {
@@ -395,7 +390,7 @@ func (a *artwork) render(d *dashboard, now time.Time) *image.Gray {
 		y, line := 369, ""
 		for _, word := range strings.Fields(d.dialogText) {
 			next := strings.TrimSpace(line + " " + word)
-			if font.MeasureString(a.body, next).Ceil() > 410 {
+			if a.measure(a.body, next) > 410 {
 				textAt(img, a.body, 92, y, line, t.ink)
 				y, line = y+20, word
 			} else {
@@ -434,6 +429,7 @@ func main() {
 	bridgeCheck := flag.String("bridge-check", "", "test pairing from the given directory")
 	previewStats := flag.String("preview-stats", "", "JSON file of PC stats to show in a PNG preview")
 	previewTodo := flag.String("preview-todo", "", "JSON file of a to-do list to show in a PNG preview")
+	previewScreen := flag.String("screen", "600x800", "screen size for a PNG preview, e.g. 1072x1448 for a Paperwhite 3")
 	flag.Parse()
 	if *bridgeCheck != "" {
 		bridge, err := readBridge(*bridgeCheck)
@@ -447,12 +443,17 @@ func main() {
 		fmt.Printf("PC connected, browser extension: %t, YouTube video: %t, PC stats: %t\n", reply.BrowserReady, reply.YouTube != nil, reply.Stats != nil)
 		return
 	}
-	art, err := openArtwork()
-	if err != nil {
-		log.Fatal(err)
-	}
 	now := time.Now()
 	if *preview != "" {
+		var screenW, screenH int
+		if _, err := fmt.Sscanf(*previewScreen, "%dx%d", &screenW, &screenH); err != nil {
+			log.Fatalf("invalid -screen %q: %v", *previewScreen, err)
+		}
+		view := newViewport(screenW, screenH)
+		art, err := openArtwork(view.scale)
+		if err != nil {
+			log.Fatal(err)
+		}
 		model := newDashboard(*previewTheme, now)
 		if *previewStats != "" {
 			raw, err := os.ReadFile(*previewStats)
@@ -474,7 +475,7 @@ func main() {
 				log.Fatal(err)
 			}
 		}
-		if err := writePNG(*preview, art.render(model, now)); err != nil {
+		if err := writePNG(*preview, view.fit(art.render(model, now), model.theme.paper)); err != nil {
 			log.Fatal(err)
 		}
 		return
@@ -490,7 +491,7 @@ func main() {
 	if err != nil && !os.IsNotExist(err) {
 		log.Print(err)
 	}
-	if err := runDevice(art, newDashboard(strings.TrimSpace(string(saved)), now), *pref); err != nil {
+	if err := runDevice(newDashboard(strings.TrimSpace(string(saved)), now), *pref); err != nil {
 		log.Fatal(err)
 	}
 }

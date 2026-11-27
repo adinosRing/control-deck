@@ -1,0 +1,112 @@
+package main
+
+import (
+	"image"
+	"image/color"
+	"image/draw"
+	"math"
+
+	"golang.org/x/image/font"
+	"golang.org/x/image/math/fixed"
+)
+
+// canvas draws the dashboard at the screen's real resolution.
+//
+// All layout code works in the 600 × 800 design grid ("logical pixels"); the
+// canvas multiplies by scale at the last moment, so lines, shapes and text
+// are rasterised natively at, for example, 1072 × 1429 on a Paperwhite 3
+// instead of being drawn small and stretched afterwards.
+type canvas struct {
+	img   *image.Gray
+	scale float64
+}
+
+func newCanvas(scale float64) *canvas {
+	w, h := scaledSize(scale)
+	return &canvas{img: image.NewGray(image.Rect(0, 0, w, h)), scale: scale}
+}
+
+func scaledSize(scale float64) (int, int) {
+	return int(math.Round(width * scale)), int(math.Round(height * scale))
+}
+
+// px converts a logical coordinate to a device pixel.
+func (c *canvas) px(v float64) int { return int(math.Round(v * c.scale)) }
+
+// unit is the device-pixel size of one logical pixel, at least 1.
+func (c *canvas) unit() int { return max(1, c.px(1)) }
+
+func (c *canvas) fillPx(r image.Rectangle, ink color.Gray) {
+	draw.Draw(c.img, r, image.NewUniform(ink), image.Point{}, draw.Src)
+}
+
+func rectangle(c *canvas, x0, y0, x1, y1 int, ink color.Gray) {
+	c.fillPx(image.Rect(c.px(float64(x0)), c.px(float64(y0)), c.px(float64(x1)), c.px(float64(y1))), ink)
+}
+
+// outline draws a one-logical-pixel border inside rect, scaled to a crisp whole number of device pixels.
+func outline(c *canvas, rect image.Rectangle, ink color.Gray) {
+	x0, y0 := c.px(float64(rect.Min.X)), c.px(float64(rect.Min.Y))
+	x1, y1 := c.px(float64(rect.Max.X)), c.px(float64(rect.Max.Y))
+	w := c.unit()
+	c.fillPx(image.Rect(x0, y0, x1, y0+w), ink)
+	c.fillPx(image.Rect(x0, y1-w, x1, y1), ink)
+	c.fillPx(image.Rect(x0, y0, x0+w, y1), ink)
+	c.fillPx(image.Rect(x1-w, y0, x1, y1), ink)
+}
+
+func (c *canvas) textPx(face font.Face, x, baseline int, value string, ink color.Gray) {
+	drawer := font.Drawer{Dst: c.img, Src: image.NewUniform(ink), Face: face, Dot: fixed.P(x, baseline)}
+	drawer.DrawString(value)
+}
+
+// textAt draws text with its origin at a logical position. Faces are already sized for the canvas scale.
+func textAt(c *canvas, face font.Face, x, baseline int, value string, ink color.Gray) {
+	c.textPx(face, c.px(float64(x)), c.px(float64(baseline)), value, ink)
+}
+
+// line draws a straight line of the given logical thickness, natively at device resolution.
+func (c *canvas) line(x0, y0, x1, y1, thickness float64, ink color.Gray) {
+	sx0, sy0, sx1, sy1 := x0*c.scale, y0*c.scale, x1*c.scale, y1*c.scale
+	t := max(1, int(math.Round(thickness*c.scale)))
+	steps := int(math.Ceil(math.Max(math.Abs(sx1-sx0), math.Abs(sy1-sy0)))) + 1
+	for i := 0; i <= steps; i++ {
+		f := float64(i) / float64(steps)
+		x := int(math.Round(sx0 + (sx1-sx0)*f))
+		y := int(math.Round(sy0 + (sy1-sy0)*f))
+		c.fillPx(image.Rect(x, y, x+t, y+t), ink)
+	}
+}
+
+// triangleRight fills a play-style triangle: full height halfHeight×2 at x0, narrowing to a point at x1.
+func (c *canvas) triangleRight(x0, x1, cy, halfHeight float64, ink color.Gray) {
+	px0, px1 := c.px(x0), c.px(x1)
+	for x := px0; x < px1; x++ {
+		f := (float64(x) + .5 - x0*c.scale) / ((x1 - x0) * c.scale)
+		h := halfHeight * (1 - f) * c.scale
+		top := int(math.Round(cy*c.scale - h))
+		bottom := int(math.Round(cy*c.scale + h))
+		c.fillPx(image.Rect(x, top, x+1, bottom), ink)
+	}
+}
+
+// measure returns the logical width of value, rounded up.
+func (a *artwork) measure(face font.Face, value string) int {
+	return int(math.Ceil(float64(font.MeasureString(face, value).Ceil()) / a.scale))
+}
+
+// fitText shortens value with "..." until it fits width logical pixels.
+func (a *artwork) fitText(face font.Face, value string, width int) string {
+	if a.measure(face, value) <= width {
+		return value
+	}
+	runes := []rune(value)
+	for len(runes) > 0 {
+		runes = runes[:len(runes)-1]
+		shortened := string(runes) + "..."
+		if a.measure(face, shortened) <= width {
+			return shortened
+		}
+	}
+	return ""
+}

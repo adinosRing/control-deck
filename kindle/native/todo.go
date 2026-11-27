@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"image"
-	"image/color"
 	"strings"
 
 	"golang.org/x/image/font"
@@ -43,7 +42,7 @@ func todoRowAt(point image.Point) (int, bool) {
 }
 
 // wrapTwoLines splits text into at most two lines that fit width, ending in "..." if it is cut.
-func wrapTwoLines(face font.Face, text string, width int) []string {
+func (a *artwork) wrapTwoLines(face font.Face, text string, width int) []string {
 	words := strings.Fields(text)
 	if len(words) == 0 {
 		return nil
@@ -52,43 +51,27 @@ func wrapTwoLines(face font.Face, text string, width int) []string {
 	rest := words
 	for len(rest) > 0 {
 		next := strings.TrimSpace(first + " " + rest[0])
-		if font.MeasureString(face, next).Ceil() > width {
+		if a.measure(face, next) > width {
 			break
 		}
 		first, rest = next, rest[1:]
 	}
 	if first == "" {
 		// A single word wider than the row: cut it.
-		return []string{fitText(face, text, width)}
+		return []string{a.fitText(face, text, width)}
 	}
 	if len(rest) == 0 {
 		return []string{first}
 	}
-	return []string{first, fitText(face, strings.Join(rest, " "), width)}
+	return []string{first, a.fitText(face, strings.Join(rest, " "), width)}
 }
 
-// thickLine draws a 2-pixel-wide straight line.
-func thickLine(img *image.Gray, x0, y0, x1, y1 int, ink color.Gray) {
-	steps := max(abs(x1-x0), abs(y1-y0))
-	for i := 0; i <= steps; i++ {
-		x := x0 + (x1-x0)*i/max(steps, 1)
-		y := y0 + (y1-y0)*i/max(steps, 1)
-		rectangle(img, x, y, x+2, y+2, ink)
-	}
-}
-
-func abs(value int) int {
-	if value < 0 {
-		return -value
-	}
-	return value
-}
-
-func drawCheckbox(img *image.Gray, t theme, x, y int, done bool) {
+func drawCheckbox(img *canvas, t theme, x, y int, done bool) {
 	if done {
 		rectangle(img, x, y, x+todoBoxSize, y+todoBoxSize, t.frame)
-		thickLine(img, x+3, y+7, x+6, y+10, t.panel)
-		thickLine(img, x+6, y+10, x+11, y+3, t.panel)
+		fx, fy := float64(x), float64(y)
+		img.line(fx+3, fy+7.5, fx+6.5, fy+11, 2, t.panel)
+		img.line(fx+6.5, fy+11, fx+12, fy+3.5, 2, t.panel)
 		return
 	}
 	outline(img, image.Rect(x, y, x+todoBoxSize, y+todoBoxSize), t.frame)
@@ -96,7 +79,7 @@ func drawCheckbox(img *image.Gray, t theme, x, y int, done bool) {
 }
 
 // centredMessage clears the whole list (row dividers included) and shows a short note.
-func (a *artwork) centredMessage(img *image.Gray, t theme, lines ...string) {
+func (a *artwork) centredMessage(img *canvas, t theme, lines ...string) {
 	rectangle(img, 396, 124, 584, 451, t.panel)
 	baseline := 270 - len(lines)*9
 	for _, line := range lines {
@@ -106,7 +89,7 @@ func (a *artwork) centredMessage(img *image.Gray, t theme, lines ...string) {
 }
 
 // drawTodo fills the TO-DO panel. online is false when the PC companion cannot be reached.
-func (a *artwork) drawTodo(img *image.Gray, t theme, list *todoList, online bool) {
+func (a *artwork) drawTodo(img *canvas, t theme, list *todoList, online bool) {
 	rectangle(img, 530, 96, 584, 119, t.panel)
 	for row := 0; row < todoRows; row++ {
 		top := todoTop + row*todoRowHeight
@@ -132,7 +115,7 @@ func (a *artwork) drawTodo(img *image.Gray, t theme, list *todoList, online bool
 		}
 		top := todoTop + row*todoRowHeight
 		drawCheckbox(img, t, todoBoxX, top+12, item.Done)
-		lines := wrapTwoLines(a.week, item.Text, todoTextWidth)
+		lines := a.wrapTwoLines(a.week, item.Text, todoTextWidth)
 		baseline := top + 24
 		if len(lines) == 2 {
 			baseline = top + 16
@@ -144,7 +127,7 @@ func (a *artwork) drawTodo(img *image.Gray, t theme, list *todoList, online bool
 		for _, line := range lines {
 			textAt(img, a.week, todoTextX, baseline, line, ink)
 			if item.Done {
-				rectangle(img, todoTextX, baseline-5, todoTextX+font.MeasureString(a.week, line).Ceil(), baseline-4, ink)
+				rectangle(img, todoTextX, baseline-5, todoTextX+a.measure(a.week, line), baseline-4, ink)
 			}
 			baseline += 16
 		}

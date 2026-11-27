@@ -163,7 +163,7 @@ func exitOnSleep(ctx context.Context, stop context.CancelFunc) {
 	}
 }
 
-func runDevice(art *artwork, model *dashboard, preference string) error {
+func runDevice(model *dashboard, preference string) error {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
 	defer stop()
 	fbink, err := fbinkPath()
@@ -198,6 +198,11 @@ func runDevice(art *artwork, model *dashboard, preference string) error {
 	}
 
 	view := screenViewport(ctx, fbink)
+	// Fonts and artwork are prepared at the screen's own resolution, so nothing is stretched.
+	art, err := openArtwork(view.scale)
+	if err != nil {
+		return err
+	}
 	if err := paint(ctx, fbink, framePath, view.fit(art.render(model, time.Now()), model.theme.paper), true); err != nil {
 		return err
 	}

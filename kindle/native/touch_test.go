@@ -6,12 +6,10 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"golang.org/x/image/font"
 )
 
 func TestConnectedDashboardUsesFixedPanels(t *testing.T) {
-	art, err := openArtwork()
+	art, err := openArtwork(1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -21,7 +19,7 @@ func TestConnectedDashboardUsesFixedPanels(t *testing.T) {
 		model.connectedUI, model.pcOnline = true, true
 		model.youtube = &youtubeVideo{Title: "Test track", Duration: 180, Playing: true}
 		frame := art.render(model, now)
-		original := art.backdrops[name]
+		original := art.backdrop(name)
 		// Panel frames and headings stay exactly as drawn in the backdrop.
 		for _, panel := range []image.Rectangle{
 			image.Rect(9, 332, 382, 358), image.Rect(389, 91, 528, 122), image.Rect(389, 451, 591, 458),
@@ -40,7 +38,7 @@ func TestConnectedDashboardUsesFixedPanels(t *testing.T) {
 }
 
 func TestConnectedDashboardShowsLiveStats(t *testing.T) {
-	art, err := openArtwork()
+	art, err := openArtwork(1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,7 +74,7 @@ func TestConnectedDashboardShowsLiveStats(t *testing.T) {
 }
 
 func TestDateFollowsTheDay(t *testing.T) {
-	art, err := openArtwork()
+	art, err := openArtwork(1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -124,16 +122,16 @@ func TestTodoTapSendsTheTappedTask(t *testing.T) {
 }
 
 func TestTodoWrapsLongTasks(t *testing.T) {
-	art, err := openArtwork()
+	art, err := openArtwork(1)
 	if err != nil {
 		t.Fatal(err)
 	}
-	lines := wrapTwoLines(art.week, "Write the operating systems group project report and send it to everyone", todoTextWidth)
+	lines := art.wrapTwoLines(art.week, "Write the operating systems group project report and send it to everyone", todoTextWidth)
 	if len(lines) != 2 || !strings.HasSuffix(lines[1], "...") {
 		t.Fatalf("unexpected wrap %q", lines)
 	}
 	for _, line := range lines {
-		if width := font.MeasureString(art.week, line).Ceil(); width > todoTextWidth {
+		if width := art.measure(art.week, line); width > todoTextWidth {
 			t.Fatalf("%q is %d px wide", line, width)
 		}
 	}
@@ -168,7 +166,7 @@ func TestKT4TouchRelease(t *testing.T) {
 func TestDashboardControlsAndRender(t *testing.T) {
 	now := time.Date(2026, 11, 18, 19, 0, 0, 0, time.UTC)
 	model := newDashboard("dark", now)
-	art, err := openArtwork()
+	art, err := openArtwork(1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -204,12 +202,17 @@ func TestViewportFitsPaperwhite(t *testing.T) {
 		t.Fatalf("parsed %d x %d %v", w, h, ok)
 	}
 	view := newViewport(w, h)
-	art, err := openArtwork()
+	art, err := openArtwork(view.scale)
 	if err != nil {
 		t.Fatal(err)
 	}
 	now := time.Now()
-	frame := view.fit(art.render(newDashboard("dark", now), now), dark.paper)
+	native := art.render(newDashboard("dark", now), now)
+	// Drawn at full resolution, not stretched: the frame is already the scaled size.
+	if native.Bounds() != image.Rect(0, 0, view.dstW, view.dstH) || view.dstW != 1072 {
+		t.Fatalf("frame drawn at %v, want %dx%d", native.Bounds(), view.dstW, view.dstH)
+	}
+	frame := view.fit(native, dark.paper)
 	if frame.Bounds() != image.Rect(0, 0, 1072, 1448) {
 		t.Fatalf("frame is %v", frame.Bounds())
 	}
@@ -220,7 +223,7 @@ func TestViewportFitsPaperwhite(t *testing.T) {
 	if got.X < 538 || got.X > 552 || got.Y < 54 || got.Y > 66 {
 		t.Fatalf("EXIT tap mapped to %v", got)
 	}
-	if native := newViewport(600, 800); !native.native() || native.fromTouch(image.Pt(10, 20)) != image.Pt(10, 20) {
+	if plain := newViewport(600, 800); !plain.native() || plain.fromTouch(image.Pt(10, 20)) != image.Pt(10, 20) {
 		t.Fatal("600x800 screens must be unchanged")
 	}
 }

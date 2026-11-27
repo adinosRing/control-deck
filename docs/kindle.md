@@ -1,6 +1,6 @@
 # Build Control Deck on a Kindle
 
-This is the build used for a **10th-generation Kindle Basic (KT4), firmware 5.16.9**. The app draws a 600 × 800 interface using FBInk and reads touchscreen input from Linux. The Kindle and Windows companion communicate over the local network. YouTube runs in the computer's browser.
+This is the build used for a **10th-generation Kindle Basic (KT4), firmware 5.16.9**. The app lays out a 600 × 800 interface and draws it natively at the screen's real resolution (for example 1072 × 1448 on a Paperwhite 3) using FBInk and reads touchscreen input from Linux. The Kindle and Windows companion communicate over the local network. YouTube runs in the computer's browser.
 
 ## What you need
 
@@ -76,6 +76,12 @@ Edit [the design](../design/) and render both backgrounds before rebuilding. The
 python -m pip install playwright
 python -m playwright install chromium
 python tools/render_backdrops.py
+```
+
+The backgrounds are rendered at 2× (1200 × 1600), and the app scales them down to the screen it runs on. To check a layout without a Kindle, render a preview at any screen size from `kindle/native`:
+
+```powershell
+go run . -preview preview.png -screen 1072x1448 -preview-stats stats.json -preview-todo todo.json
 ```
 
 ## Open-source repositories
