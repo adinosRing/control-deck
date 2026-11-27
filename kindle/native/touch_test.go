@@ -290,7 +290,7 @@ func TestTodayTextFitsBesideWeather(t *testing.T) {
 func TestQuickLaunchButtons(t *testing.T) {
 	model := newDashboard("dark", time.Now())
 	model.connectedUI, model.pcOnline = true, true
-	for x, want := range map[int]string{60: "Witcher", 540: "YouTube Music", 440: "YouTube"} {
+	for x, want := range map[int]string{60: "Cyberpunk", 540: "YouTube Music", 440: "YouTube"} {
 		model.pending = nil
 		model.tap(image.Pt(x, 750), time.Now())
 		if model.pending == nil || model.pending.Name != want {

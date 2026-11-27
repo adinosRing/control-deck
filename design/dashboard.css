@@ -213,6 +213,7 @@ input[type="range"]::-moz-range-thumb { width: 10px; height: 11px; border: 1px s
 .launch h2 { flex-basis: 28px; border-bottom: 2px solid var(--frame); }
 .shortcuts { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 7px; flex: 1; padding-top: 6px; }
 .shortcuts button { min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 2px solid var(--frame); border-radius: 7px; font-size: 17px; }
+.shortcuts button[data-launch="Cyberpunk"] { font-size: 15px; letter-spacing: -.6px; white-space: nowrap; }
 .shortcuts canvas[data-icon] { width: 36px; height: 36px; margin-bottom: 5px; }
 
 .overlay {

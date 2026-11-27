@@ -28,7 +28,7 @@ class ActionUnavailable(Exception):
     pass
 
 
-WITCHER_STEAM_APP = "292030"
+CYBERPUNK_STEAM_APP = "1091500"
 
 
 def steam_libraries():
@@ -59,29 +59,32 @@ def steam_libraries():
 
 
 def find_red_launcher():
-    """Find The Witcher 3's REDprelauncher.exe in Steam or GOG installs."""
-    candidates = [library / "steamapps" / "common" / "The Witcher 3" / "REDprelauncher.exe" for library in steam_libraries()]
-    for pattern_root in (Path(r"C:\GOG Games"), Path(r"C:\Program Files (x86)\GOG Galaxy\Games")):
-        try:
-            candidates.extend(pattern_root.glob("*Witcher 3*/REDprelauncher.exe"))
-        except OSError:
-            pass
+    """Find Cyberpunk 2077's REDprelauncher.exe in Steam, GOG or Epic installs."""
+    candidates = [library / "steamapps" / "common" / "Cyberpunk 2077" / "REDprelauncher.exe" for library in steam_libraries()]
+    drives = [f"{letter}:\\" for letter in "CDEFGH"]
+    for drive in drives:
+        for folder in ("GOG Games", r"Program Files (x86)\GOG Galaxy\Games", r"Program Files\Epic Games", "Epic Games", "Games"):
+            root = Path(drive) / folder
+            try:
+                candidates.extend(root.glob("Cyberpunk*2077/REDprelauncher.exe"))
+            except OSError:
+                pass
     return next((path for path in candidates if path.is_file()), None)
 
 
 def launch(name):
     code = shutil.which("code.cmd")
     code_app = Path(code).parent.parent / "Code.exe" if code else None
-    if name == "Witcher":
+    if name == "Cyberpunk":
         launcher = find_red_launcher()
         try:
             if launcher:
                 # Run it from the game folder, as the RED launcher expects.
                 os.startfile(str(launcher), cwd=str(launcher.parent))
             else:
-                os.startfile(f"steam://rungameid/{WITCHER_STEAM_APP}")
+                os.startfile(f"steam://rungameid/{CYBERPUNK_STEAM_APP}")
         except OSError as exc:
-            raise ActionUnavailable("Windows could not start The Witcher 3 launcher.") from exc
+            raise ActionUnavailable("Windows could not start the Cyberpunk 2077 launcher.") from exc
         return
     links = {
         "ChatGPT": "https://chatgpt.com/",
