@@ -21,6 +21,7 @@
     slashes: "M10 6 3 18 M16 6 9 18 M22 6l-7 12",
     browser: "M22 12a10 10 0 1 0-20 0 10 10 0 1 0 20 0z M17 12a5 10 0 1 0-10 0 5 10 0 1 0 10 0z M3 8h18 M2 12h20 M3 16h18",
     terminal: "M4 6l6 6-6 6 M13 18h8",
+    disc: "M21 12a9 9 0 1 0-18 0 9 9 0 1 0 18 0z M14.5 12a2.5 2.5 0 1 0-5 0 2.5 2.5 0 1 0 5 0z",
     chip: "M7 7h10v10H7z M10 10h4v4h-4z M9.5 3v4 M14.5 3v4 M9.5 17v4 M14.5 17v4 M3 9.5h4 M3 14.5h4 M17 9.5h4 M17 14.5h4",
     ytmusic: "M21 12a9 9 0 1 0-18 0 9 9 0 1 0 18 0z M16.5 12a4.5 4.5 0 1 0-9 0 4.5 4.5 0 1 0 9 0z",
     partly: "M8 3v1.5 M3.3 8H2 M4.5 4.5l1 1 M11.5 4.5l-1 1 M5.4 10.6A3.2 3.2 0 1 1 11 6.6 M8.5 20h9a3.8 3.8 0 0 0 .3-7.6 5.6 5.6 0 0 0-10.6 1.4A3.1 3.1 0 0 0 8.5 20z"
@@ -407,13 +408,10 @@
   updateVolume();
   updateProgress();
   updateClock();
-  // Preview only: tap a task to tick it off. On the Kindle, tasks come from todo.txt on the PC.
-  const todoItems = Array.from(document.querySelectorAll("#todo-list li:not(.empty)"));
-  function updateTodoCount() {
-    write("todo-count", todoItems.filter((item) => item.classList.contains("done")).length + "/" + todoItems.length);
-  }
-  todoItems.forEach((item) => item.addEventListener("click", () => { item.classList.toggle("done"); updateTodoCount(); }));
-  updateTodoCount();
+  // Preview cover: the demo album art, enlarged. On the Kindle, the real cover comes from YouTube Music.
+  const cover = byId("cover").getContext("2d");
+  cover.imageSmoothingEnabled = false;
+  cover.drawImage(byId("album"), 4, 0, 88, 88, 0, 0, 176, 176);
   // Group redraws in five-second steps to limit e-ink refreshes.
   window.setInterval(() => {
     if (closed || document.hidden) return;

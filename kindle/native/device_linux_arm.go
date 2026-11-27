@@ -249,24 +249,21 @@ func runDevice(model *dashboard, preference string) error {
 			model.pcOnline = update.err == nil
 			if update.action == nil {
 				model.browserReady = update.reply.BrowserReady
-				if wasOnline == model.pcOnline && wasBrowserReady == model.browserReady && reflect.DeepEqual(model.youtube, update.reply.YouTube) && reflect.DeepEqual(model.stats, update.reply.Stats) && reflect.DeepEqual(model.todo, update.reply.Todo) && reflect.DeepEqual(model.weather, update.reply.Weather) {
+				if wasOnline == model.pcOnline && wasBrowserReady == model.browserReady && reflect.DeepEqual(model.youtube, update.reply.YouTube) && reflect.DeepEqual(model.stats, update.reply.Stats) && model.cover == update.reply.Cover && reflect.DeepEqual(model.weather, update.reply.Weather) {
 					continue
 				}
 				model.youtube = update.reply.YouTube
 				model.stats = update.reply.Stats
-				model.todo = update.reply.Todo
+				model.cover = update.reply.Cover
 				model.weather = update.reply.Weather
 			} else if update.err != nil {
 				model.show("PC OFFLINE", "Connect the Kindle and PC to the same local network and start the PC companion. Then try again.")
 			} else if update.reply.Error != "" {
 				model.show("PC ACTION", update.reply.Error)
-			} else if update.action.Action == "todo-toggle" {
-				if update.reply.Todo != nil {
-					model.todo = update.reply.Todo
-				}
 			} else if update.action.Name == "" {
 				model.browserReady = update.reply.BrowserReady
 				model.youtube = update.reply.YouTube
+				model.cover = update.reply.Cover
 			}
 		case tap := <-results:
 			if tap.err != nil {

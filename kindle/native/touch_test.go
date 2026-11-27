@@ -3,7 +3,6 @@ package main
 import (
 	"image"
 	"image/color"
-	"strings"
 	"testing"
 	"time"
 )
@@ -96,43 +95,6 @@ func TestDateFollowsTheDay(t *testing.T) {
 		}
 		if same {
 			t.Errorf("%s did not change with the date", name)
-		}
-	}
-}
-
-func TestTodoTapSendsTheTappedTask(t *testing.T) {
-	now := time.Now()
-	model := newDashboard("dark", now)
-	model.connectedUI, model.pcOnline = true, true
-	model.todo = &todoList{Items: []todoItem{{Line: 0, Text: "first"}, {Line: 4, Text: "second task"}}, Total: 2}
-	model.tap(image.Pt(480, todoTop+todoRowHeight+20), now)
-	if model.pending == nil || model.pending.Action != "todo-toggle" || model.pending.Value != 4 || model.pending.Text != "second task" {
-		t.Fatalf("unexpected action %+v", model.pending)
-	}
-	model.pending = nil
-	model.tap(image.Pt(480, todoTop+5*todoRowHeight+20), now)
-	if model.pending != nil {
-		t.Fatalf("tapping an empty row sent %+v", model.pending)
-	}
-	model.pcOnline = false
-	model.tap(image.Pt(480, todoTop+20), now)
-	if model.pending != nil {
-		t.Fatalf("tapping while offline sent %+v", model.pending)
-	}
-}
-
-func TestTodoWrapsLongTasks(t *testing.T) {
-	art, err := openArtwork(1)
-	if err != nil {
-		t.Fatal(err)
-	}
-	lines := art.wrapTwoLines(art.week, "Write the operating systems group project report and send it to everyone", todoTextWidth)
-	if len(lines) != 2 || !strings.HasSuffix(lines[1], "...") {
-		t.Fatalf("unexpected wrap %q", lines)
-	}
-	for _, line := range lines {
-		if width := art.measure(art.week, line); width > todoTextWidth {
-			t.Fatalf("%q is %d px wide", line, width)
 		}
 	}
 }
@@ -296,5 +258,37 @@ func TestQuickLaunchButtons(t *testing.T) {
 		if model.pending == nil || model.pending.Name != want {
 			t.Errorf("tap at x=%d sent %+v, want %q", x, model.pending, want)
 		}
+	}
+}
+
+func TestCoverPanelShowsAlbumArt(t *testing.T) {
+	art, err := openArtwork(1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	source := image.NewGray(image.Rect(0, 0, 300, 200))
+	for y := 0; y < 200; y++ {
+		for x := 0; x < 300; x++ {
+			source.Pix[y*300+x] = uint8(x * 255 / 299)
+		}
+	}
+	model := newDashboard("dark", time.Now())
+	model.connectedUI, model.pcOnline, model.browserReady = true, true, true
+	model.youtube = &youtubeVideo{Title: "A very long song title that has to wrap onto two lines", Artist: "Someone", Art: "abc", Source: "music", Playing: true}
+	model.cover = newCoverArt("abc", source)
+	frame := art.render(model, time.Now())
+	// The 3:2 picture is cropped to a square from the centre, so its edges are mid-greys, not black and white.
+	left, right := frame.GrayAt(coverX0+1, (coverY0+coverY1)/2).Y, frame.GrayAt(coverX1-2, (coverY0+coverY1)/2).Y
+	if left < 30 || left > 70 || right < 185 || right > 225 {
+		t.Fatalf("cover edges are %d and %d, want a centre-cropped gradient", left, right)
+	}
+	if lines := art.wrapTwoLines(art.count, model.youtube.Title, coverTextWidth); len(lines) != 2 {
+		t.Fatalf("title wrapped into %d lines", len(lines))
+	}
+	// A different song without its cover yet shows the vinyl placeholder, not the old cover.
+	model.youtube = &youtubeVideo{Title: "Next", Art: "def"}
+	frame = art.render(model, time.Now())
+	if got := frame.GrayAt(coverCentre, (coverY0+coverY1)/2).Y; got != dark.frame.Y {
+		t.Fatalf("placeholder centre is %d, want the frame colour", got)
 	}
 }

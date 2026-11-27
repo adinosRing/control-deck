@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"image"
 	"io"
 	"net"
 	"net/http"
@@ -19,6 +20,8 @@ import (
 
 type youtubeVideo struct {
 	Title, Artist                    string
+	Art                              string // ID of the cover the PC has ready, or ""
+	Source                           string // "music" for YouTube Music
 	Playing, Captions, Repeat, Muted bool
 	Duration, Position               int
 	Volume                           *int
@@ -27,7 +30,7 @@ type youtubeVideo struct {
 type bridgeReply struct {
 	YouTube      *youtubeVideo
 	Stats        *pcStats
-	Todo         *todoList
+	Cover        *coverArt `json:"-"`
 	Weather      *weatherInfo
 	BrowserReady bool `json:"browser_ready"`
 	OK           bool
@@ -51,6 +54,7 @@ type pcBridge struct {
 	config bridgeConfig
 	client *http.Client
 	active string
+	cover  *coverArt
 }
 
 func readBridge(folder string) (*pcBridge, error) {
@@ -143,6 +147,7 @@ func (b *pcBridge) poll(ctx context.Context) (bridgeReply, error) {
 		result, err := b.request(ctx, address, "/status", nil)
 		if err == nil && result.Error == "" {
 			b.active = address
+			b.attachCover(ctx, &result)
 			return result, nil
 		}
 	}
@@ -159,15 +164,53 @@ func (b *pcBridge) send(ctx context.Context, action bridgeAction) (bridgeReply, 
 	path := "/youtube"
 	if action.Name != "" {
 		path = "/launch"
-	} else if action.Action == "todo-toggle" {
-		path = "/todo"
 	}
 	// A timed-out action may already have run. Do not retry it.
 	reply, err := b.request(ctx, b.active, path, &action)
 	if err != nil {
 		b.active = ""
+		return reply, err
 	}
-	return reply, err
+	b.attachCover(ctx, &reply)
+	return reply, nil
+}
+
+// attachCover adds the album cover to a reply, downloading it from the PC when the song changes.
+func (b *pcBridge) attachCover(ctx context.Context, reply *bridgeReply) {
+	video := reply.YouTube
+	if video == nil || video.Art == "" {
+		return
+	}
+	if b.cover == nil || b.cover.ID != video.Art {
+		art, err := b.fetchCover(ctx, video.Art)
+		if err != nil {
+			return // try again on the next poll
+		}
+		b.cover = art
+	}
+	reply.Cover = b.cover
+}
+
+func (b *pcBridge) fetchCover(ctx context.Context, id string) (*coverArt, error) {
+	url := "https://" + net.JoinHostPort(b.active, strconv.Itoa(b.config.Port)) + "/art?id=" + id
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+b.config.Token)
+	reply, err := b.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer reply.Body.Close()
+	if reply.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("PC companion returned HTTP %d for the cover", reply.StatusCode)
+	}
+	source, _, err := image.Decode(io.LimitReader(reply.Body, 2<<20))
+	if err != nil {
+		return nil, err
+	}
+	return newCoverArt(id, source), nil
 }
 
 type bridgeUpdate struct {

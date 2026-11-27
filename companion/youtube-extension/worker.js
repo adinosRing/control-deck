@@ -1,6 +1,6 @@
 importScripts("pairing.js");
 
-const youtubeSites = ["https://www.youtube.com/*", "https://m.youtube.com/*"];
+const youtubeSites = ["https://www.youtube.com/*", "https://m.youtube.com/*", "https://music.youtube.com/*"];
 let connection = null;
 
 async function playerCommand(action, value) {

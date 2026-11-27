@@ -1,14 +1,14 @@
 {
   "manifest_version": 3,
   "name": "Control Deck for YouTube",
-  "description": "Control YouTube from the paired Kindle dashboard.",
-  "version": "1.0.0",
+  "description": "Control YouTube and YouTube Music from the paired Kindle dashboard.",
+  "version": "1.1.0",
   "minimum_chrome_version": "116",
   "permissions": ["alarms"],
-  "host_permissions": ["https://www.youtube.com/*", "https://m.youtube.com/*"],
+  "host_permissions": ["https://www.youtube.com/*", "https://m.youtube.com/*", "https://music.youtube.com/*"],
   "background": {"service_worker": "worker.js"},
   "content_scripts": [{
-    "matches": ["https://www.youtube.com/*", "https://m.youtube.com/*"],
+    "matches": ["https://www.youtube.com/*", "https://m.youtube.com/*", "https://music.youtube.com/*"],
     "js": ["player.js"],
     "run_at": "document_idle"
   }]

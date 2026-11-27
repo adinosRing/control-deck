@@ -38,9 +38,9 @@ The pairing command generates a browser token, a separate Kindle token, and a TL
 1. Run `python companion/bridge.py` from the repository root and leave it running. The Kindle uses HTTPS on TCP port **8765**, and the browser extension connects through Windows loopback on **8766**. Allow the Kindle's local subnet through the firewall if required. Keep both ports off public internet.
 2. In Brave, open `brave://extensions`. In Chrome, open `chrome://extensions`. Enable **Developer mode**, select **Load unpacked**, and choose the `companion/youtube-extension` folder after pairing has generated `pairing.js`. [Chromium extension loading instructions](https://developer.chrome.com/docs/extensions/get-started/tutorial/hello-world#load_an_unpacked_extension)
 3. The companion also samples the PC every 2.5 seconds for the **PC Performance Monitor**: CPU, RAM, battery and network speed through `psutil`, and GPU and VRAM through `nvidia-smi` when an NVIDIA GPU is installed. Values the PC cannot report show `--`. A desktop without a battery shows **AC POWER**. The Kindle polls every 5 seconds.
-4. The **TO-DO** panel reads `companion/todo.txt`, which the companion creates on first run. Write one task per line. A line starting with `x ` is done, and lines starting with `#` are ignored. Tapping a task on the Kindle adds or removes the `x ` and saves the file. Open tasks are listed first, up to eight. To keep the list somewhere else, start the companion with `python companion/bridge.py --todo "C:\Users\you\Documents\todo.txt"`.
+4. The **ALBUM ART** panel shows the cover, title and artist of what is playing on YouTube Music (or the thumbnail of a YouTube video). The browser extension reads the cover address from the page, the companion downloads it from Google's image servers (`*.googleusercontent.com`, `*.ytimg.com`, `*.ggpht.com` only), and the Kindle fetches it from the companion and draws it in greyscale. Nothing playing shows a record placeholder.
 5. The **TODAY** panel shows the weather. The companion fetches it from [Open-Meteo](https://open-meteo.com/) every 15 minutes (free, no API key). On first run it creates `companion/weather-location.txt`: write a city name (`Bengaluru`) or coordinates (`12.97, 77.59`) on its own line, and add a line `fahrenheit` for °F. If you leave it empty, the location is detected from the PC's internet connection via ipwho.is.
-6. Open or reload a YouTube video in that browser profile and press Play once. The extension chooses an active YouTube player, preferring a playing tab. Captions and next-video controls depend on the video or playlist.
+6. Open or reload a YouTube video or a YouTube Music tab in that browser profile and press Play once. After updating the extension's files, press **Reload** on its card in the extensions page. The extension chooses an active YouTube player, preferring a playing tab. Captions and next-video controls depend on the video or playlist.
 
 ## 3. Install and test on the Kindle
 
@@ -82,7 +82,7 @@ python tools/render_backdrops.py
 The backgrounds are rendered at 2× (1200 × 1600), and the app scales them down to the screen it runs on. To check a layout without a Kindle, render a preview at any screen size from `kindle/native`:
 
 ```powershell
-go run . -preview preview.png -screen 1072x1448 -preview-stats stats.json -preview-todo todo.json
+go run . -preview preview.png -screen 1072x1448 -preview-stats stats.json -preview-cover cover.jpg -preview-song "Title|Artist"
 ```
 
 ## Open-source repositories

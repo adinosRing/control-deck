@@ -18,7 +18,7 @@ sys.path.insert(0, str(HERE / "vendor"))
 
 from browser_link import BrowserLink, BrowserUnavailable
 from pc_stats import PCStats
-from todo import TodoFile, TodoUnavailable
+from cover_art import CoverArt
 from weather import Weather
 
 LOG = logging.getLogger("kindle-dashboard")
@@ -150,9 +150,21 @@ class BridgeHandler(BaseHTTPRequestHandler):
                     video = link.query("status") if link.ready() else None
                 except BrowserUnavailable:
                     video = None
-                self.send_json(200, {"youtube": video, "browser_ready": link.ready(), "stats": self.server.stats.snapshot(),
-                                     "todo": self.server.todo.snapshot(),
+                self.send_json(200, {"youtube": self.server.covers.publish(video), "browser_ready": link.ready(),
+                                     "stats": self.server.stats.snapshot(),
                                      "weather": self.server.weather.snapshot()})
+            elif self.path.startswith("/art?id="):
+                cover = self.server.covers.get(self.path[len("/art?id="):])
+                if not cover:
+                    self.send_json(404, {"error": "That album cover is no longer playing."})
+                    return
+                data, kind = cover
+                self.send_response(200)
+                self.send_header("Content-Type", kind)
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("Content-Length", str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
             else:
                 self.send_json(404, {"error": "Unknown dashboard request."})
 
@@ -169,23 +181,18 @@ class BridgeHandler(BaseHTTPRequestHandler):
             if self.path == "/launch" and isinstance(data.get("name"), str):
                 launch(data["name"])
                 result = {"ok": True}
-            elif self.path == "/todo" and data.get("action") == "todo-toggle":
-                line, text = data.get("value"), data.get("text")
-                if type(line) is not int or not isinstance(text, str):
-                    raise ValueError("Invalid to-do command.")
-                self.server.todo.toggle(line, text)
-                result = {"todo": self.server.todo.snapshot(), "ok": True}
             elif self.path == "/youtube" and data.get("action") in {
                 "previous", "next", "toggle", "seek", "captions", "repeat", "volume", "mute"
             }:
                 value = data.get("value")
                 if data["action"] in {"seek", "volume"} and (type(value) is not int or not 0 <= value <= 100):
                     raise ValueError("The control value must be between 0 and 100.")
-                result = {"youtube": self.server.browser.query(data["action"], value), "browser_ready": True, "ok": True}
+                video = self.server.browser.query(data["action"], value)
+                result = {"youtube": self.server.covers.publish(video), "browser_ready": True, "ok": True}
             else:
                 raise ValueError("Unknown dashboard command.")
             self.send_json(200, result)
-        except (ActionUnavailable, BrowserUnavailable, TodoUnavailable) as exc:
+        except (ActionUnavailable, BrowserUnavailable) as exc:
             self.send_json(409, {"error": str(exc)})
         except (ValueError, TypeError):
             self.send_json(400, {"error": "Invalid dashboard command."})
@@ -211,7 +218,6 @@ class BridgeServer(ThreadingHTTPServer):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=Path, default=HERE / "bridge-config.json")
-    parser.add_argument("--todo", type=Path, default=HERE / "todo.txt", help="to-do list shown on the Kindle")
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
     config = json.loads(args.config.read_text(encoding="utf-8"))
@@ -223,9 +229,8 @@ def main():
         server.tls = tls
         server.browser = browser
         server.stats = PCStats().start()
-        server.todo = TodoFile(args.todo)
+        server.covers = CoverArt()
         server.weather = Weather(HERE / "weather-location.txt").start()
-        LOG.info("To-do list: %s", args.todo.resolve())
         browser_server = browser.listen()
         server.authorization = ("Bearer " + config["token"]).encode("ascii")
         server.networks = tuple(ipaddress.ip_network(item) for item in config["networks"])

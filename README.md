@@ -4,7 +4,7 @@
 >
 > **What this fork adds**
 > - **Live PC Performance Monitor**: CPU, GPU, RAM, VRAM, battery and network speed from the Windows companion (`psutil`, plus `nvidia-smi` for NVIDIA GPUs), drawn as gauges and sparklines.
-> - **TO-DO panel** (replaces the big clock): tasks come from `companion/todo.txt` on the PC, and tapping a task on the Kindle ticks it off in the file.
+> - **ALBUM ART panel** (replaces the big clock): the cover, title and artist of the song playing on **YouTube Music** on the PC, also shown in the YouTube panel. The browser extension now works on music.youtube.com too.
 > - **TODAY panel** (replaces Codex Limits): the date, ISO week and day of the year, plus **live weather** (icon, temperature, conditions, high/low) from [Open-Meteo](https://open-meteo.com/), fetched by the PC companion. Set your city in `companion/weather-location.txt`, or leave it empty to detect it automatically.
 > - **Sharp on any screen size**: everything is drawn natively at the Kindle's real resolution (fonts, lines, gauges and 2× background artwork), so it fills a Kindle Paperwhite 3 (1072×1448) without blur, and taps are mapped to match.
 > - **Cleaner look and a real battery**: single-line panel frames instead of double borders, and the status bar shows the Kindle's actual battery level and charging state.
@@ -30,4 +30,4 @@ I turned a 10th-generation Kindle into a desk controller for my Windows PC. The 
 - [Dashboard design](design/) contains the HTML, CSS, and JavaScript used to generate the Kindle artwork. Open `index.html` in a browser for a standalone preview. The preview uses sample data.
 - [Earlier prototypes](legacy/) include the browser-based Kindle version, standalone native build, and Spotify companion.
 
-The PC performance panel shows live CPU, RAM, battery and network stats from the Windows companion, plus GPU and VRAM on PCs with an NVIDIA GPU. The TO-DO panel shows tasks from `companion/todo.txt` on the PC; tap a task on the Kindle to tick it off. The TODAY panel shows the date. To change the layout, edit the design and regenerate the backdrops. [Backdrop instructions](docs/kindle.md#customize-the-artwork)
+The PC performance panel shows live CPU, RAM, battery and network stats from the Windows companion, plus GPU and VRAM on PCs with an NVIDIA GPU. The ALBUM ART panel shows the cover of the song playing on YouTube Music. The TODAY panel shows the date. To change the layout, edit the design and regenerate the backdrops. [Backdrop instructions](docs/kindle.md#customize-the-artwork)

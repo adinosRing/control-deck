@@ -147,11 +147,9 @@ $bridge = Join-Path $root "companion\bridge.py"
 Start-Process -FilePath $pyExe -ArgumentList ($pyArgs + @("`"$bridge`"")) -WorkingDirectory $root
 Start-Sleep -Seconds 3
 Done "Running in its own window. If Windows Firewall asks, choose 'Private networks' and Allow."
-$todo = Join-Path $root "companion\todo.txt"
-if (Test-Path $todo) { Start-Process notepad.exe $todo }
 
 Step "Almost done"
-Write-Host "   - Add your tasks in todo.txt (Notepad just opened it)."
+Write-Host "   - Play a song on YouTube Music in your browser to see its album art on the Kindle."
 Write-Host "   - Eject the Kindle, join the same Wi-Fi as this PC, and open 'Personal Dashboard Offline' in the Library."
 Write-Host "   - Next time, just double-click 'Start Control Deck.bat'."
 Write-Host "   - YouTube controls (optional): load companion\youtube-extension as an unpacked extension in Brave or Chrome."

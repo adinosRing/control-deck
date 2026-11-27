@@ -57,7 +57,7 @@ type dashboard struct {
 	connectedUI, pcOnline, browserReady bool
 	youtube                             *youtubeVideo
 	stats                               *pcStats
-	todo                                *todoList
+	cover                               *coverArt
 	weather                             *weatherInfo
 	kindleBattery                       int // -1 when unknown
 	kindleCharging                      bool
@@ -129,7 +129,7 @@ func (d *dashboard) tap(point image.Point, now time.Time) (exit, flash bool) {
 			return false, true
 		case x >= 446 && x < 490:
 			if d.connectedUI {
-				d.show("CONTROL DECK", "Quick Launch, YouTube, the PC monitor, weather and the to-do list come from the PC companion. Tap a task to tick it off in todo.txt.")
+				d.show("CONTROL DECK", "Quick Launch, YouTube, album art, the PC monitor and weather come from the PC companion. Play a song on YouTube Music to see its cover.")
 			} else {
 				d.show("CONTROL DECK", "Offline dashboard for Kindle. Music, PC stats, tasks and shortcuts use sample data.")
 			}
@@ -139,13 +139,6 @@ func (d *dashboard) tap(point image.Point, now time.Time) (exit, flash bool) {
 		}
 	}
 	if d.connectedUI {
-		if row, ok := todoRowAt(point); ok {
-			if d.todo != nil && d.pcOnline && row < len(d.todo.Items) {
-				item := d.todo.Items[row]
-				d.pending = &bridgeAction{Action: "todo-toggle", Value: item.Line, Text: item.Text}
-			}
-			return false, false
-		}
 		d.pending = connectedTap(point)
 		return false, false
 	}
@@ -325,9 +318,13 @@ func (a *artwork) draw(d *dashboard, now time.Time) *canvas {
 			}
 		}
 		if track := d.youtube; track != nil && d.pcOnline {
-			status = "YOUTUBE PAUSED"
+			label := "YOUTUBE"
+			if track.Source == "music" {
+				label = "YT MUSIC"
+			}
+			status = label + " PAUSED"
 			if track.Playing {
-				status = "YOUTUBE PLAYING"
+				status = label + " PLAYING"
 			}
 			if track.Title != "" {
 				song.title, song.artist = track.Title, track.Artist
@@ -386,7 +383,7 @@ func (a *artwork) draw(d *dashboard, now time.Time) *canvas {
 			stats = nil
 		}
 		a.drawStats(img, t, stats)
-		a.drawTodo(img, t, d.todo, d.pcOnline)
+		a.drawCoverPanel(img, t, d)
 		a.drawWeather(img, t, d.weather, d.pcOnline)
 	}
 
@@ -436,7 +433,8 @@ func main() {
 	previewTheme := flag.String("theme", "dark", "theme for a PNG preview")
 	bridgeCheck := flag.String("bridge-check", "", "test pairing from the given directory")
 	previewStats := flag.String("preview-stats", "", "JSON file of PC stats to show in a PNG preview")
-	previewTodo := flag.String("preview-todo", "", "JSON file of a to-do list to show in a PNG preview")
+	previewCover := flag.String("preview-cover", "", "picture to show as album art in a PNG preview")
+	previewSong := flag.String("preview-song", "Midnight Drive|Nexora", "title|artist of the song in a PNG preview")
 	previewWeather := flag.String("preview-weather", "", "JSON file of weather to show in a PNG preview")
 	previewBattery := flag.Int("battery", -1, "Kindle battery level to show in a PNG preview")
 	previewCharging := flag.Bool("charging", false, "show the Kindle as charging in a PNG preview")
@@ -458,8 +456,8 @@ func main() {
 				weather = "error: " + reply.Weather.Error
 			}
 		}
-		fmt.Printf("PC connected, browser extension: %t, YouTube video: %t, PC stats: %t, to-do: %t, weather: %s\n",
-			reply.BrowserReady, reply.YouTube != nil, reply.Stats != nil, reply.Todo != nil, weather)
+		fmt.Printf("PC connected, browser extension: %t, YouTube video: %t, album art: %t, PC stats: %t, weather: %s\n",
+			reply.BrowserReady, reply.YouTube != nil, reply.Cover != nil, reply.Stats != nil, weather)
 		return
 	}
 	now := time.Now()
@@ -495,15 +493,21 @@ func main() {
 				log.Fatal(err)
 			}
 		}
-		if *previewTodo != "" {
-			raw, err := os.ReadFile(*previewTodo)
+		if *previewCover != "" {
+			file, err := os.Open(*previewCover)
 			if err != nil {
 				log.Fatal(err)
 			}
-			model.connectedUI, model.pcOnline = true, true
-			if err := json.Unmarshal(raw, &model.todo); err != nil {
+			source, _, err := image.Decode(file)
+			file.Close()
+			if err != nil {
 				log.Fatal(err)
 			}
+			title, artist, _ := strings.Cut(*previewSong, "|")
+			volume := 70
+			model.connectedUI, model.pcOnline, model.browserReady = true, true, true
+			model.youtube = &youtubeVideo{Title: title, Artist: artist, Art: "preview", Source: "music", Playing: true, Duration: 236, Position: 102, Volume: &volume}
+			model.cover = newCoverArt("preview", source)
 		}
 		if err := writePNG(*preview, view.fit(art.render(model, now), model.theme.paper)); err != nil {
 			log.Fatal(err)
