@@ -70,7 +70,9 @@ def find_red_launcher():
             if line and not line.startswith("#"):
                 path = Path(line)
                 if path.is_dir():
-                    path = path / "REDprelauncher.exe"
+                    # A game folder: the launcher is usually at its top, sometimes one or two folders down.
+                    found = [path / "REDprelauncher.exe", *path.glob("*/REDprelauncher.exe"), *path.glob("*/*/REDprelauncher.exe")]
+                    path = next((item for item in found if item.is_file()), path / "REDprelauncher.exe")
                 if path.is_file() and path.name.lower() == "redprelauncher.exe":
                     return path
                 LOG.info("red-launcher.txt points to %s, which is not REDprelauncher.exe", line)
