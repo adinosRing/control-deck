@@ -45,7 +45,7 @@ var tracks = []struct {
 	{"Afterglow", "Signal Coast", 204},
 	{"Static Bloom", "Vesper Lane", 261},
 }
-var shortcuts = []string{"ChatGPT", "Claude", "VS Code", "Browser", "YouTube", "Terminal"}
+var shortcuts = []string{"Witcher", "Claude", "VS Code", "Browser", "YouTube", "YouTube Music"}
 
 type dashboard struct {
 	theme                               theme

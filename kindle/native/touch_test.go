@@ -183,7 +183,7 @@ func TestDashboardControlsAndRender(t *testing.T) {
 		t.Fatal("demo controls did not update their state")
 	}
 	model.tap(image.Pt(545, 740), now)
-	if model.dialogTitle != "TERMINAL" {
+	if model.dialogTitle != "YOUTUBE MUSIC" {
 		t.Fatal("shortcut dialog missing")
 	}
 	model.tap(image.Pt(420, 460), now)
@@ -283,6 +283,18 @@ func TestTodayTextFitsBesideWeather(t *testing.T) {
 			if got := art.fitText(art.tiny, label, 102); got != label {
 				t.Errorf("%dx%d: %q was shortened to %q", screen[0], screen[1], label, got)
 			}
+		}
+	}
+}
+
+func TestQuickLaunchButtons(t *testing.T) {
+	model := newDashboard("dark", time.Now())
+	model.connectedUI, model.pcOnline = true, true
+	for x, want := range map[int]string{60: "Witcher", 540: "YouTube Music", 440: "YouTube"} {
+		model.pending = nil
+		model.tap(image.Pt(x, 750), time.Now())
+		if model.pending == nil || model.pending.Name != want {
+			t.Errorf("tap at x=%d sent %+v, want %q", x, model.pending, want)
 		}
 	}
 }
