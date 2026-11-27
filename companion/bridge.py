@@ -127,21 +127,6 @@ def find_browser():
     return None
 
 
-def start_app_id(name):
-    """The Start menu ID of an installed app (Store/MSIX apps included), via Get-StartApps."""
-    try:
-        result = subprocess.run(
-            ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command",
-             "Get-StartApps | Where-Object { $_.Name -eq $env:CD_APP } | Select-Object -First 1 -ExpandProperty AppID"],
-            capture_output=True, text=True, timeout=8, env={**os.environ, "CD_APP": name},
-            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-        )
-    except (OSError, subprocess.SubprocessError):
-        return None
-    app_id = result.stdout.strip()
-    return app_id or None
-
-
 def open_first(targets):
     """Open the first target that Windows accepts; stale shortcuts are skipped."""
     for target in targets:
@@ -155,13 +140,37 @@ def open_first(targets):
     return False
 
 
+CLAUDE_PACKAGE = "Claude_pzs8sxrjxfjjc"  # the Claude desktop app's package family on Windows
+
+
+def package_app_id(name):
+    """The launch ID (family!app) of an installed Windows app package, e.g. the Claude desktop app."""
+    script = (
+        "$p = Get-AppxPackage -Name $env:CD_APP | Select-Object -First 1; "
+        "if ($p) { $id = (Get-AppxPackageManifest $p).Package.Applications.Application | "
+        "Select-Object -First 1 -ExpandProperty Id; \"$($p.PackageFamilyName)!$id\" }"
+    )
+    try:
+        result = subprocess.run(
+            ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script],
+            capture_output=True, text=True, timeout=10, env={**os.environ, "CD_APP": name},
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    app_id = result.stdout.strip()
+    return app_id if "!" in app_id and not app_id.endswith("!") else None
+
+
 def claude_targets():
-    local = Path(os.environ.get("LOCALAPPDATA", ""))
-    app_id = start_app_id("Claude")
+    # Never the Start menu shortcut: an old install can leave one pointing at a deleted claude.exe.
+    app_id = package_app_id("Claude")
     yield f"shell:AppsFolder\\{app_id}" if app_id else None
+    local = Path(os.environ.get("LOCALAPPDATA", ""))
+    if (local / "Packages" / CLAUDE_PACKAGE).is_dir():
+        yield f"shell:AppsFolder\\{CLAUDE_PACKAGE}!Claude"
     for candidate in (local / "AnthropicClaude" / "claude.exe", local / "Programs" / "Claude" / "Claude.exe"):
         yield candidate if candidate.is_file() else None
-    yield start_menu_shortcut("Claude")
     yield "claude://"
     yield "https://claude.ai/"
 
