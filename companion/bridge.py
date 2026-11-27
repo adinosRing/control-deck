@@ -9,6 +9,7 @@ import re
 from pathlib import Path
 import shutil
 import ssl
+import subprocess
 import sys
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -79,34 +80,120 @@ def find_red_launcher():
     return next((path for path in candidates if path.is_file()), None)
 
 
-def launch(name):
-    code = shutil.which("code.cmd")
-    code_app = Path(code).parent.parent / "Code.exe" if code else None
-    if name == "Cyberpunk":
-        launcher = find_red_launcher()
+def start_menu_shortcut(*names):
+    """A Start Menu shortcut (.lnk) whose name matches, from the user's or all users' Start Menu."""
+    wanted = {name.lower() for name in names}
+    roots = [Path(os.environ.get(var, ""), "Microsoft", "Windows", "Start Menu", "Programs") for var in ("APPDATA", "PROGRAMDATA")]
+    for root in roots:
+        if not root.is_dir():
+            continue
+        for shortcut in root.rglob("*.lnk"):
+            if shortcut.stem.lower() in wanted:
+                return shortcut
+    return None
+
+
+def app_path(exe):
+    """The full path Windows registers for an app such as brave.exe ("App Paths")."""
+    try:
+        import winreg
+    except ImportError:
+        return None
+    for hive in (winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE):
         try:
+            with winreg.OpenKey(hive, rf"Software\Microsoft\Windows\CurrentVersion\App Paths\{exe}") as key:
+                path = Path(winreg.QueryValueEx(key, "")[0].strip('"'))
+                if path.is_file():
+                    return path
+        except OSError:
+            continue
+    return None
+
+
+def find_browser():
+    """Brave, Chrome or Edge, in that order."""
+    local = Path(os.environ.get("LOCALAPPDATA", ""))
+    programs = [Path(os.environ.get(var, "")) for var in ("PROGRAMFILES", "PROGRAMFILES(X86)")]
+    for exe, folder in (("brave.exe", ("BraveSoftware", "Brave-Browser", "Application")),
+                        ("chrome.exe", ("Google", "Chrome", "Application")),
+                        ("msedge.exe", ("Microsoft", "Edge", "Application"))):
+        found = app_path(exe)
+        if found:
+            return found
+        for base in [local, *programs]:
+            candidate = base.joinpath(*folder, exe)
+            if candidate.is_file():
+                return candidate
+    return None
+
+
+def find_claude():
+    local = Path(os.environ.get("LOCALAPPDATA", ""))
+    shortcut = start_menu_shortcut("Claude")
+    if shortcut:
+        return shortcut
+    for candidate in (local / "AnthropicClaude" / "claude.exe", local / "Programs" / "Claude" / "Claude.exe"):
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def find_vscode():
+    code = shutil.which("code.cmd")
+    if code:
+        app = Path(code).parent.parent / "Code.exe"
+        if app.is_file():
+            return app
+    return start_menu_shortcut("Visual Studio Code")
+
+
+def open_web_app(name, url):
+    """An installed web app if there is one, else the site in its own app window (no tabs or address bar)."""
+    shortcut = start_menu_shortcut(name)
+    if shortcut:
+        os.startfile(str(shortcut))
+        return
+    browser = find_browser()
+    if browser:
+        subprocess.Popen([str(browser), f"--app={url}"], close_fds=True,
+                         creationflags=getattr(subprocess, "DETACHED_PROCESS", 0))
+        return
+    os.startfile(url)
+
+
+def launch(name):
+    try:
+        if name == "Cyberpunk":
+            launcher = find_red_launcher()
             if launcher:
                 # Run it from the game folder, as the RED launcher expects.
                 os.startfile(str(launcher), cwd=str(launcher.parent))
             else:
                 os.startfile(f"steam://rungameid/{CYBERPUNK_STEAM_APP}")
-        except OSError as exc:
-            raise ActionUnavailable("Windows could not start the Cyberpunk 2077 launcher.") from exc
-        return
-    links = {
-        "ChatGPT": "https://chatgpt.com/",
-        "Claude": "https://claude.ai/",
-        "VS Code": str(code_app) if code_app and code_app.is_file() else code,
-        "Browser": "https://www.google.com/",
-        "YouTube": "https://www.youtube.com/",
-        "YouTube Music": "https://music.youtube.com/",
-        "Terminal": shutil.which("wt.exe") or shutil.which("powershell.exe"),
-    }
-    target = links.get(name)
-    if not target:
-        raise ActionUnavailable(f"{name} is unavailable on the PC.")
-    try:
-        os.startfile(target)
+        elif name == "Claude":
+            app = find_claude()
+            os.startfile(str(app) if app else "https://claude.ai/")
+        elif name == "VS Code":
+            app = find_vscode()
+            if not app:
+                raise ActionUnavailable("VS Code is not installed on the PC.")
+            os.startfile(str(app))
+        elif name == "Browser":
+            browser = find_browser()
+            os.startfile(str(browser) if browser else "https://www.google.com/")
+        elif name == "YouTube":
+            open_web_app("YouTube", "https://www.youtube.com/")
+        elif name == "YouTube Music":
+            open_web_app("YouTube Music", "https://music.youtube.com/")
+        elif name == "ChatGPT":
+            open_web_app("ChatGPT", "https://chatgpt.com/")
+        elif name == "Terminal":
+            terminal = shutil.which("wt.exe") or shutil.which("powershell.exe")
+            if not terminal:
+                raise ActionUnavailable("No terminal found on the PC.")
+            os.startfile(terminal)
+        else:
+            raise ActionUnavailable(f"{name} is unavailable on the PC.")
     except OSError as exc:
         raise ActionUnavailable(f"Windows could not open {name}.") from exc
 
