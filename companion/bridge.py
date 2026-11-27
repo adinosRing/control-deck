@@ -58,17 +58,24 @@ def steam_libraries():
     return unique
 
 
+RED_GAME_FOLDERS = ("Cyberpunk 2077", "The Witcher 3", "The Witcher 3 Wild Hunt")
+
+
 def find_red_launcher():
-    """Find Cyberpunk 2077's REDprelauncher.exe in Steam, GOG or Epic installs."""
-    candidates = [library / "steamapps" / "common" / "Cyberpunk 2077" / "REDprelauncher.exe" for library in steam_libraries()]
-    drives = [f"{letter}:\\" for letter in "CDEFGH"]
-    for drive in drives:
-        for folder in ("GOG Games", r"Program Files (x86)\GOG Galaxy\Games", r"Program Files\Epic Games", "Epic Games", "Games"):
-            root = Path(drive) / folder
-            try:
-                candidates.extend(root.glob("Cyberpunk*2077/REDprelauncher.exe"))
-            except OSError:
-                pass
+    """Find REDprelauncher.exe in Steam, GOG or Epic game folders."""
+    candidates = [
+        library / "steamapps" / "common" / folder / "REDprelauncher.exe"
+        for library in steam_libraries()
+        for folder in RED_GAME_FOLDERS
+    ]
+    for letter in "CDEFGH":
+        for parent in ("GOG Games", r"Program Files (x86)\GOG Galaxy\Games", r"Program Files\Epic Games", "Epic Games", "Games"):
+            root = Path(f"{letter}:\\") / parent
+            for pattern in ("Cyberpunk*/REDprelauncher.exe", "*Witcher 3*/REDprelauncher.exe"):
+                try:
+                    candidates.extend(root.glob(pattern))
+                except OSError:
+                    pass
     return next((path for path in candidates if path.is_file()), None)
 
 
