@@ -29,7 +29,7 @@ class ActionUnavailable(Exception):
     pass
 
 
-CYBERPUNK_STEAM_APP = "1091500"
+RED_LAUNCHER_FILE = HERE / "red-launcher.txt"  # optional: the full path to REDprelauncher.exe
 
 
 def steam_libraries():
@@ -63,16 +63,30 @@ RED_GAME_FOLDERS = ("Cyberpunk 2077", "The Witcher 3", "The Witcher 3 Wild Hunt"
 
 
 def find_red_launcher():
-    """Find REDprelauncher.exe in Steam, GOG or Epic game folders."""
+    """REDprelauncher.exe from red-launcher.txt, or from Steam, GOG, Epic or Xbox game folders."""
+    try:
+        for line in RED_LAUNCHER_FILE.read_text(encoding="utf-8-sig").splitlines():
+            line = line.strip().strip('"')
+            if line and not line.startswith("#"):
+                path = Path(line)
+                if path.is_dir():
+                    path = path / "REDprelauncher.exe"
+                if path.is_file() and path.name.lower() == "redprelauncher.exe":
+                    return path
+                LOG.info("red-launcher.txt points to %s, which is not REDprelauncher.exe", line)
+    except OSError:
+        pass
     candidates = [
         library / "steamapps" / "common" / folder / "REDprelauncher.exe"
         for library in steam_libraries()
         for folder in RED_GAME_FOLDERS
     ]
     for letter in "CDEFGH":
-        for parent in ("GOG Games", r"Program Files (x86)\GOG Galaxy\Games", r"Program Files\Epic Games", "Epic Games", "Games"):
+        for parent in ("GOG Games", r"Program Files (x86)\GOG Galaxy\Games", r"Program Files\Epic Games", "Epic Games",
+                       "Games", "XboxGames", r"SteamLibrary\steamapps\common", r"Steam\steamapps\common"):
             root = Path(f"{letter}:\\") / parent
-            for pattern in ("Cyberpunk*/REDprelauncher.exe", "*Witcher 3*/REDprelauncher.exe"):
+            for pattern in ("Cyberpunk*/REDprelauncher.exe", "Cyberpunk*/Content/REDprelauncher.exe",
+                            "*Witcher 3*/REDprelauncher.exe", "*Witcher 3*/Content/REDprelauncher.exe"):
                 try:
                     candidates.extend(root.glob(pattern))
                 except OSError:
@@ -202,11 +216,11 @@ def launch(name):
     try:
         if name == "Cyberpunk":
             launcher = find_red_launcher()
-            if launcher:
-                # Run it from the game folder, as the RED launcher expects.
-                os.startfile(str(launcher), cwd=str(launcher.parent))
-            else:
-                os.startfile(f"steam://rungameid/{CYBERPUNK_STEAM_APP}")
+            if not launcher:
+                raise ActionUnavailable("REDprelauncher.exe was not found. Put its full path in "
+                                        "companion\\red-launcher.txt on the PC, then tap again.")
+            # Run it from the game folder, as the RED launcher expects.
+            os.startfile(str(launcher), cwd=str(launcher.parent))
         elif name == "Claude":
             if not open_first(claude_targets()):
                 raise ActionUnavailable("Windows could not open Claude.")
